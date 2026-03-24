@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Documentation
+    url: https://github.com/ACER/point/wiki
+    about: Consultez la documentation du projet
+  - name: Discussions
+    url: https://github.com/ACER/point/discussions
+    about: Rejoignez nos discussions pour poser des questions
