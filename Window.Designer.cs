@@ -54,17 +54,15 @@ partial class Window
         Score.Dock = DockStyle.Top;
         Score.Controls.Add(scoreTable(player1.nom, player2.nom));
         Score.PerformLayout();
-        //LeftInterface - Boutons de suggestion désactivés pour l'instant
-        LeftInterface.Width = 150;
+        //LeftInterface - Barre de lancement de missile pour joueur 1
+        LeftInterface.Width = 200;
         LeftInterface.Dock = DockStyle.Left;
-        // Button control1 = Suggest(player1, player2);
-        // LeftInterface.Controls.Add(control1);
+        LeftInterface.Controls.Add(MissileBar(player1, player2));
 
-        //RightInterface - Boutons de suggestion désactivés pour l'instant
-        RightInterface.Width = 150;
+        //RightInterface - Barre de lancement de missile pour joueur 2
+        RightInterface.Width = 200;
         RightInterface.Dock = DockStyle.Right;
-        // Button control2 = Suggest(player2, player1);
-        // RightInterface.Controls.Add(control2);
+        RightInterface.Controls.Add(MissileBar(player2, player1));
 
         //Menu
         Menu.Height = 150;
@@ -163,6 +161,10 @@ partial class Window
             game = true;
             clickedPoints.Clear();
             Line.ClickedPoints.Clear();
+            player1.Missiles.Clear();
+            player2.Missiles.Clear();
+            player1.HasLaunchedMissileThisTurn = false;
+            player2.HasLaunchedMissileThisTurn = false;
             label1.BackColor = Color.Red;
             _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate();
@@ -423,6 +425,10 @@ partial class Window
     {
         if (game && hasStarted)
         {
+            // Bloquer le clic si le joueur courant a déjà lancé un missile ce tour
+            Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
+            if (currentPlayer.HasLaunchedMissileThisTurn) return;
+
             // Utiliser les paramètres de GameConfig pour flexibilité
             int tolerance = GameConfig.ClickTolerance;
             int gridSize = GameConfig.GridSize;
@@ -578,6 +584,176 @@ partial class Window
             game = false;
             return;
         }
+
+        // Dessiner les missiles des deux joueurs
+        foreach (var missile in player1.Missiles)
+            missile.paint(sender, e);
+
+        foreach (var missile in player2.Missiles)
+            missile.paint(sender, e);
+    }
+
+    /// <summary>
+    /// Crée et retourne un panel avec la barre de lancement de missile pour un joueur
+    /// </summary>
+    private Panel MissileBar(Player player, Player adversaire)
+    {
+        Panel missilePanel = new Panel();
+        missilePanel.Dock = DockStyle.Fill;
+        missilePanel.AutoScroll = true;
+
+        // FlowLayoutPanel pour disposer les contrôles verticalement
+        FlowLayoutPanel layout = new FlowLayoutPanel();
+        layout.Dock = DockStyle.Fill;
+        layout.FlowDirection = FlowDirection.TopDown;
+        layout.WrapContents = false;
+        layout.AutoScroll = true;
+
+        // Titre
+        Label titleLabel = new Label();
+        titleLabel.Text = $"Missile - {player.nom}";
+        titleLabel.AutoSize = true;
+        titleLabel.Font = new Font(titleLabel.Font, FontStyle.Bold);
+        layout.Controls.Add(titleLabel);
+
+        // Ligne de départ
+        Label lineLabel = new Label();
+        lineLabel.Text = "Colonne départ (1-" + GameConfig.GridColumns + "):";
+        lineLabel.AutoSize = true;
+        layout.Controls.Add(lineLabel);
+
+        NumericUpDown columnInput = new NumericUpDown();
+        columnInput.Name = "columnInput";
+        columnInput.Minimum = 1;
+        columnInput.Maximum = GameConfig.GridColumns - 1;
+        columnInput.Value = GameConfig.GridColumns / 2;
+        columnInput.Width = 180;
+        layout.Controls.Add(columnInput);
+
+        // Puissance
+        Label powerLabel = new Label();
+        powerLabel.Text = "Puissance (1-5):";
+        powerLabel.AutoSize = true;
+        layout.Controls.Add(powerLabel);
+
+        TrackBar powerSlider = new TrackBar();
+        powerSlider.Name = "powerSlider";
+        powerSlider.Minimum = 1;
+        powerSlider.Maximum = 5;
+        powerSlider.Value = 3;
+        powerSlider.Width = 180;
+        layout.Controls.Add(powerSlider);
+
+        Label powerValue = new Label();
+        powerValue.Text = "3";
+        powerValue.AutoSize = true;
+        layout.Controls.Add(powerValue);
+
+        // Mise à jour du label de puissance
+        powerSlider.ValueChanged += (s, e) => powerValue.Text = powerSlider.Value.ToString();
+
+        // Direction
+        Label directionLabel = new Label();
+        directionLabel.Text = "Direction:";
+        directionLabel.AutoSize = true;
+        layout.Controls.Add(directionLabel);
+
+        ComboBox directionCombo = new ComboBox();
+        directionCombo.Name = "directionCombo";
+        directionCombo.Items.AddRange(new string[] { "Vertical", "Horizontal", "Diagonale ↗", "Diagonale ↘" });
+        directionCombo.SelectedIndex = 1;
+        directionCombo.Width = 180;
+        layout.Controls.Add(directionCombo);
+
+        // Bouton de lancement
+        Button launchButton = new Button();
+        launchButton.Text = "🚀 Lancer !";
+        launchButton.Width = 180;
+        launchButton.Height = 40;
+        launchButton.Click += (s, e) => LaunchMissile(player, adversaire, (int)columnInput.Value, powerSlider.Value, directionCombo.SelectedIndex + 1);
+        layout.Controls.Add(launchButton);
+
+        missilePanel.Controls.Add(layout);
+        return missilePanel;
+    }
+
+    /// <summary>
+    /// Gère le lancement d'un missile
+    /// </summary>
+    private void LaunchMissile(Player player, Player adversaire, int column, int power, int direction)
+    {
+        // Vérifier si c'est le tour du joueur
+        Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
+        if (currentPlayer != player)
+        {
+            MessageBox.Show("Ce n'est pas votre tour !");
+            return;
+        }
+
+        // Vérifier si le joueur a déjà lancé un missile ce tour
+        if (player.HasLaunchedMissileThisTurn)
+        {
+            MessageBox.Show("Vous avez déjà lancé un missile ce tour !");
+            return;
+        }
+
+        if (!game)
+        {
+            MessageBox.Show("Le jeu n'a pas commencé !");
+            return;
+        }
+
+        // Calculer la position de départ selon la direction
+        Point launchPosition = direction switch
+        {
+            1 => new Point(column * GameConfig.GridSize, 0), // Vertical
+            2 => new Point(0, column * GameConfig.GridSize), // Horizontal
+            3 => new Point(0, 0), // Diagonale ↗
+            4 => new Point(0, GameConfig.GridRows * GameConfig.GridSize - GameConfig.GridSize), // Diagonale ↘
+            _ => new Point(0, 0)
+        };
+
+        // Créer et lancer le missile
+        Missile missile = player.CreateMissile();
+        missile.Launch(launchPosition, direction, power);
+
+        // Vérifier les collisions
+        List<Point> enemyPoints = adversaire.line.GetPlayerPoints();
+        if (missile.CheckCollision(enemyPoints))
+        {
+            // Récupérer le point touché et le supprimer
+            List<Point> trajectory = missile.GetTrajectory();
+            if (trajectory.Count > 0)
+            {
+                Point impactPoint = trajectory[trajectory.Count - 1];
+                RemoveEnemyPoint(impactPoint, adversaire);
+            }
+        }
+
+        // Marquer le missile comme lancé et passer au tour suivant
+        player.HasLaunchedMissileThisTurn = true;
+        tour++;
+        adversaire.ResetTurn();
+
+        _isDirty = true;
+        space.Invalidate();
+    }
+
+    /// <summary>
+    /// Supprime un point ennemi touché par un missile
+    /// Utilise Point.Empty pour masquer le point sans casser l'alternance pair/impair
+    /// </summary>
+    private void RemoveEnemyPoint(Point p, Player adversaire)
+    {
+        for (int i = 0; i < clickedPoints.Count; i++)
+        {
+            if (clickedPoints[i] == p)
+            {
+                clickedPoints[i] = new Point(-1, -1); // Masquer le point avec Point.Empty équivalent
+                break;
+            }
+        }
     }
 
 }
+

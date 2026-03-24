@@ -26,12 +26,14 @@ public class Player
         }
     }
     public Color color;
+    public List<Missile> Missiles { get; private set; } = new List<Missile>();
+    public bool HasLaunchedMissileThisTurn { get; set; } = false;
 
     public Player(string Nom, int order, Color cl){
         nom = Nom;
         Order = order;
         color = cl;
-        line = new Line(order); 
+        line = new Line(order);
     }
     /// <summary>
     /// Dessine les lignes gagnantes du joueur sur le terrain.
@@ -182,6 +184,24 @@ public class Player
         // if(line.line(nombre, line.LShapeLine()).Count > 0 ) return true;
 
         else return false;
+    }
+
+    /// <summary>
+    /// Crée un missile pour ce joueur
+    /// </summary>
+    public Missile CreateMissile()
+    {
+        Missile missile = new Missile(color);
+        Missiles.Add(missile);
+        return missile;
+    }
+
+    /// <summary>
+    /// Réinitialise l'état du missile pour le prochain tour
+    /// </summary>
+    public void ResetTurn()
+    {
+        HasLaunchedMissileThisTurn = false;
     }
 
 }
