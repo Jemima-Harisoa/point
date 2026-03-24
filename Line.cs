@@ -16,7 +16,16 @@ namespace point
     {
         ///Classe de gestion de tracés des lignes
         private  static List<Point> _clickedPoints = new List<Point>();
-        private int step = 50;
+
+        /// <summary>
+        /// Espacement entre les points de la grille.
+        /// Utilise GameConfig.GridSize pour s'adapter à la taille configurée.
+        /// </summary>
+        private int step
+        {
+            get { return GameConfig.GridSize; }
+        }
+
         private int _type;
         private static List<Point> _limit = new List<Point>();
 

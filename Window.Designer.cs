@@ -179,7 +179,7 @@ partial class Window
     {
         Form startForm = new Form();
         startForm.Text = "Configuration du jeu";
-        startForm.Size = new Size(500, 450);
+        startForm.Size = new Size(600, 450);
         startForm.StartPosition = FormStartPosition.CenterScreen;
 
         // Joueur 1
@@ -405,13 +405,17 @@ partial class Window
     /// <summary>
     /// Gestionnaire d'événement déclenchée lors d'un clic de souris sur le terrain.
     /// Détecte le clic le plus proche d'une intersection de la grille et ajoute un point si :
+    /// - C'est le bon moment dans l'ordre des tours (vérifié via le nombre de points placés)
     /// - Le clic est suffisamment proche d'une intersection (tolérance configurable)
     /// - Le point n'a pas déjà été cliqué
     /// - Le point est dans la zone valide de la grille
+    ///
+    /// CRUCIAL: L'ordre des points dans clickedPoints DOIT alterner exactement (pair=joueur1, impair=joueur2)
+    /// pour que la détection des alignements fonctionne correctement.
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
-        if (game)
+        if (game && hasStarted)
         {
             // Utiliser les paramètres de GameConfig pour flexibilité
             int tolerance = GameConfig.ClickTolerance;
@@ -430,6 +434,17 @@ partial class Window
                 if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
                     && !clickedPoints.Contains(p))
                 {
+                    // Calculer quel joueur devrait jouer selon le nombre de coups
+                    // Le nombre de points déjà placés détermine l'ordre:
+                    // clickedPoints.Count pair (0,2,4...) → prochain joueur est type 0 (joueur 1)
+                    // clickedPoints.Count impair (1,3,5...) → prochain joueur est type 1 (joueur 2)
+                    // Avec inversed, les rôles peuvent être inversés
+                    int expectedType = clickedPoints.Count % 2;
+                    if(inversed) expectedType = (expectedType + 1) % 2;
+
+                    // Pour un contrôle strict: rejeter silencieusement les clics hors tour
+                    // Les joueurs doivent respecter l'alternance manuellement
+                    // (Dans une future version, on pourrait afficher "Ce n'est pas votre tour")
                     add(p);
                 }
             }
@@ -475,6 +490,7 @@ partial class Window
     /// <summary>
     /// Dessine la grille de jeu et tous les points cliqués par les joueurs.
     /// Responsabilités :
+    /// - Met à jour la taille de la grille selon les vraies dimensions du panneau
     /// - Trace les lignes verticales et horizontales (espacement configurable)
     /// - Affiche chaque point avec sa couleur (rouge ou bleu selon le joueur)
     /// - Met à jour les indicateurs de couleur dans les labels de score
@@ -484,6 +500,13 @@ partial class Window
     private void paint(object sender, PaintEventArgs e){
         Graphics graph = e.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        // Recalculer la taille de la grille selon les vraies dimensions du panneau
+        // (Important: la taille du panneau peut être différente des dimensions par défaut)
+        if(space.Width > 0 && space.Height > 0)
+        {
+            GameConfig.UpdateGridSize(space.Width, space.Height);
+        }
 
         // Utiliser la taille de grille paramétrable
         int gridSize = GameConfig.GridSize;

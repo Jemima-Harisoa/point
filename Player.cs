@@ -35,173 +35,127 @@ public class Player
     }
     /// <summary>
     /// Dessine les lignes gagnantes du joueur sur le terrain.
-    /// La logique simplifie le rendu en trois catégories:
-    ///
-    /// 1. LIGNE DROITE (vertical/horizontal/diagonal):
-    ///    Dessine une seule ligne du premier au dernier point
-    ///
-    /// 2. DIAGONALE:
-    ///    Dessine une seule ligne du premier au dernier point
-    ///
-    /// 3. FORMATION L:
-    ///    Dessine deux lignes perpendiculaires passant par l'intersection
-    ///
-    /// OPTIMISÉ: Bénéficie du cache de Line.Liste() et du double buffering.
+    /// Récupère la configuration gagnante (points alignés = GameConfig.PointsToWin) et dessine :
+    /// - Pour une ligne droite (vertical/horizontal) : une seule ligne du premier au dernier point
+    /// - Pour une diagonale : une seule ligne du premier au dernier point
+    /// - Pour une forme en L : deux lignes perpendiculaires passant par le point d'intersection
+    /// OPTIMISÉ : Bénéficie du cache de Line.Liste() et double buffering
     /// </summary>
     public void paint(object sender, PaintEventArgs paint){
         Graphics graph = paint.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-        // Récupérer la ligne gagnante (GameConfig.PointsToWin = 5 par défaut)
+        // Utiliser le nombre de points configuré dans GameConfig, pas valeur fixe
         List<Point> ligne = line.Liste(GameConfig.PointsToWin);
-        if(ligne.Count == 0) return;
+        if(ligne.Count == 0) return; // Aucune ligne gagnante trouvée
 
         Pen Pen = new Pen(color, 5);
 
-        // Cas 1: Ligne droite (vertical/horizontal)
-        // Cas 2: Diagonale (géré de la même façon que la ligne droite)
-        if(Line.VerticalOrHorizontal(ligne) || Line.isDiagonal(ligne))
+        // Cas 1: Ligne droite (verticale ou horizontale)
+        if(Line.VerticalOrHorizontal(ligne))
         {
-            // Tracer une seule ligne du premier au dernier point
+            // Pour une ligne droite : dessiner du premier au dernier point
             Point premier = ligne[0];
             Point dernier = ligne[ligne.Count - 1];
             graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
         }
+        // Cas 2: Diagonale (ligne inclinée)
+        else if(Line.isDiagonal(ligne))
+        {
+            // Pour une diagonale : dessiner du premier au dernier point
+            Point premier = ligne[0];
+            Point dernier = ligne[ligne.Count - 1];
+            graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
+        }
+        // Cas 3: Formation L
         else
         {
-            // Cas 3: Formation L
-            // Identifier le point d'intersection et tracer deux lignes perpendiculaires
+            // Pour une forme en L : dessiner les deux lignes perpendiculaires
             Point intersection = line.Intersection(ligne);
-            Point extremityVertical = line.Extremity(ligne, intersection, true);
-            Point extremityHorizontal = line.Extremity(ligne, intersection, false);
-
-            // Tracer la ligne verticale
-            graph.DrawLine(Pen, intersection.X, intersection.Y,
-                          extremityVertical.X, extremityVertical.Y);
-
-            // Tracer la ligne horizontale
-            graph.DrawLine(Pen, intersection.X, intersection.Y,
-                          extremityHorizontal.X, extremityHorizontal.Y);
+            Point ExtremityVertical = line.Extremity(ligne, intersection, true);
+            Point ExtremityHorizontal = line.Extremity(ligne, intersection, false);
+            graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityVertical.X, ExtremityVertical.Y);
+            graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityHorizontal.X, ExtremityHorizontal.Y);
         }
     }
     /// <summary>
     /// Suggère le meilleur point à jouer pour un joueur selon une stratégie intelligente.
-    /// La stratégie se décompose en deux phases:
-    ///
-    /// PHASE 1 - Formations en L (nombre=4):
-    /// Cette phase cherche à compléter une formation L-shape en 4 points.
-    /// Pour éviter que le point n'aplatisse la formation en ligne droite,
-    /// on vérifie que l'intersection reste unique et inchangée.
-    ///
-    /// PHASE 2 - Lignes droites (nombre <= 4):
-    /// Cette phase cherche à étendre une ligne droite (vertical/horizontal/diagonale).
-    /// Tout point qui complète la ligne est accepté.
+    /// Cherche un point qui :
+    /// - Complète une configuration L-shape (pour nombre=4) en maintenant l'intersection unique
+    /// - Ou étend une ligne verticale/horizontale (pour nombre <= 4)
+    /// Retourne le premier point valide trouvé, ou Point() vide si aucun coup optimal.
     /// </summary>
     /// <param name="player">Le joueur pour lequel suggérer un coup</param>
-    /// <param name="nombre">Le nombre de points nécessaires: 3 (trois points),
-    ///                       4 (formation gagnante), ou 5 (victoire)</param>
+    /// <param name="nombre">Le nombre de points nécessaires dans la formation (3, 4, ou 5)</param>
     /// <returns>Le point optimal à jouer, ou Point() vide si aucun coup ne peut être trouvé</returns>
     public static Point Suggest(Player player, int nombre){
-        // Récupérer tous les points de suggestion candidats
-        // Combine les suggestions des deux types de formations (L-shape et droites)
         Line l = player.line;
-        List<Point> suggestion = l.Combine(l.Suggestion(nombre), l.SuggestionL(nombre));
-
-        // DEBUG: Afficher la liste des suggestions (à décommenter pour debug)
-        // Console.WriteLine($"[SUGGEST] Recherche pour {nombre} points - {suggestion.Count} suggestions trouvées");
+        List<Point> suggestion =  l.Combine(l.Suggestion(nombre),  l.SuggestionL(nombre));
+        // Console.WriteLine("liste des point de suggestion :");
         // foreach (var item in suggestion)
         // {
         //     Console.Write($"({item.X}, {item.Y}) ");
         // }
         // Console.WriteLine();
 
-        // PHASE 1: Valider les suggestions pour formations L-shape (nombre=4)
-        // Cherche les points qui complètent une formation L sans la transformer en ligne droite
-        List<List<Point>> lshapePoints = player.line.LShapeLine();
-        foreach (var index in player.line.line(nombre, lshapePoints))
+        List<List<Point>> points = player.line.LShapeLine();
+        foreach (var index in player.line.line(nombre, points))
         {
-            List<Point> currentLine = lshapePoints[index];
-            Point originalIntersection = player.line.Intersection(currentLine);
-            int originalIntersectionCount = player.line.Intersect(currentLine).Count;
-
-            // Tester chaque point de suggestion
-            foreach (var suggestedPoint in suggestion)
+            List<Point> points1 = points[index];
+            Point inter = player.line.Intersection(points1);
+            int interNumber = player.line.Intersect(points1).Count;
+            bool estVerticalOuHorizontal = Line.VerticalOrHorizontal(points1);
+            foreach (var item in suggestion)
             {
-                // Ajouter temporairement le point suggéré
-                if(!currentLine.Contains(suggestedPoint)) currentLine.Add(suggestedPoint);
-
-                // Vérifier si le point est déjà placé
-                bool pointAlreadyPlaced = Line.ClickedPoints.Contains(suggestedPoint);
-
-                // Analyser la nouvelle formation après l'ajout du point
-                int newIntersectionCount = player.line.Intersect(currentLine).Count;
-                Point newIntersection = player.line.Intersection(currentLine);
-                bool stillLShape = !Line.VerticalOrHorizontal(currentLine);
-
-                // CRITÈRE POUR NOMBRE=4:
-                // Le point est bon si:
-                // 1. C'est une formation L (pas une ligne droite)
-                // 2. L'intersection reste la même position
-                // 3. Le nombre d'intersections ne change pas
-                // 4. Le point n'est pas déjà placé
-                if(nombre == 4 && stillLShape &&
-                   newIntersection.X == originalIntersection.X &&
-                   newIntersection.Y == originalIntersection.Y &&
-                   newIntersectionCount == originalIntersectionCount &&
-                   !pointAlreadyPlaced)
-                {
-                    Console.WriteLine($"[SUGGEST] Point L-shape suggéré: ({suggestedPoint.X}, {suggestedPoint.Y})");
-                    if(currentLine.Contains(suggestedPoint)) currentLine.Remove(suggestedPoint);
-                    return suggestedPoint;
+                if(!points1.Contains(item)) points1.Add(item);
+                int newInterNumber = player.line.Intersect(points1).Count;
+                Point inter1 = player.line.Intersection(points1);
+                bool result = !Line.VerticalOrHorizontal(points1);
+                // Voir si le point d'intersection reste unique donc unchanged
+                if(nombre == 4 &&  result  && inter1.X == inter.X && inter1.Y == inter.Y && newInterNumber == interNumber){
+                    if (!Line.ClickedPoints.Contains(item)){
+                        Console.WriteLine($" point suggérée ({item.X}, {item.Y}) ");
+                        return item;
+                    }
                 }
-
-                // Enlever le point pour tester le suivant
-                if(currentLine.Contains(suggestedPoint)) currentLine.Remove(suggestedPoint);
+                if(points1.Contains(item))points1.Remove(item);
             }
+        
         }
 
-        // PHASE 2: Valider les suggestions pour lignes droites
-        // Cherche les points qui complètent une ligne droite (verticale/horizontale/diagonale)
-        List<List<Point>> straightPoints = player.line.getLineList();
-        foreach (var index in player.line.line(nombre, straightPoints))
+         points = player.line.getLineList();
+        foreach (var index in player.line.line(nombre, points))
         {
-            List<Point> currentLine = straightPoints[index];
-            bool isLinearFormation = Line.VerticalOrHorizontal(currentLine);
-
-            // Tester chaque point de suggestion
-            foreach (var suggestedPoint in suggestion)
+            List<Point> points1 = points[index];
+          
+            bool estVerticalOuHorizontal = Line.VerticalOrHorizontal(points1);
+            foreach (var item in suggestion)
             {
-                // Ajouter temporairement le point suggéré
-                if(!currentLine.Contains(suggestedPoint)) currentLine.Add(suggestedPoint);
-
-                // CRITÈRE POUR LIGNES DROITES (nombre <= 4):
-                // Le point est bon s'il n'est pas déjà placé
-                // (La formation peut être droite OU L-shape, on accepte les deux)
-                if(!Line.ClickedPoints.Contains(suggestedPoint))
-                {
-                    Console.WriteLine($"[SUGGEST] Point ligne suggéré: ({suggestedPoint.X}, {suggestedPoint.Y})");
-                    if(currentLine.Contains(suggestedPoint)) currentLine.Remove(suggestedPoint);
-                    return suggestedPoint;
+                if(!points1.Contains(item)) points1.Add(item);
+               
+                // Voir si le point d'intersection reste unique donc unchanged
+                if((estVerticalOuHorizontal || !estVerticalOuHorizontal) && nombre <= 4) {
+                    if (!Line.ClickedPoints.Contains(item)){
+                    Console.WriteLine($" point suggérée ({item.X}, {item.Y}) ");
+                        return item;
+                    }
                 }
-
-                // Enlever le point pour tester le suivant
-                if(currentLine.Contains(suggestedPoint)) currentLine.Remove(suggestedPoint);
+                if(points1.Contains(item))points1.Remove(item);
             }
+        
         }
-
-        // Aucun point optimal trouvé
         return new Point();
     }
 
     /// <summary>
     /// Vérifie si le joueur peut remporter la partie au prochain coup.
-    /// Retourne vrai si le joueur possède une formation complète avec
-    /// (GameConfig.PointsForCanWin) points alignés.
-    /// Par défaut: 4 points (un coup avant la victoire avec 5 points)
+    /// Retourne vrai si le joueur possède une formation de 4 points alignés
+    /// (un coup de plus complèterait 5 points = victoire).
     /// </summary>
-    /// <returns>true si le joueur peut gagner au prochain coup</returns>
+    /// <returns>true si le joueur a une configuration 4-gagnante potentielle</returns>
     public bool CanWin(){
-        return has(GameConfig.PointsForCanWin);
+        if(has(4)) return true;
+        else return false;
     }
 
     /// <summary>
