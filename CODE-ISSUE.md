@@ -1,3 +1,4 @@
+# Alleger le code et améliorer les performances
 ##  Analyse des Bottlenecks : goulots d'étranglement
 
 ### **1. PROBLÈME MAJEUR: `getLineList()` - O(n²) ou pire** 
@@ -49,4 +50,13 @@ Pour 500 points: ~250 000 opérations
 - Les suggestions de point ne redconnaissent pas les ligne en L quand elle on une formation U 
 - La detection du L prend du retard pour la condition gagnante
 - Il y a des intersections ou on a peut pas ajouter de point quand bien meme qu'il y a pas de point dessus 
--  
+
+# Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L
+- [] Simplifier la logique du jeu victoire si n point aligne en ligne droite 
+- [] Commenter les point de suggestion  
+- [] Parametrer le nombre de ligne et colonne ainsi que le nombre de ligne a aligner pour dire que le joueur a gagner avec le modal de depart 
+
+
+
+
+
