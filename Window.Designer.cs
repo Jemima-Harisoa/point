@@ -353,22 +353,22 @@ partial class Window
     /// <summary>
     /// Gestionnaire d'événement déclenchée lors d'un clic de souris sur le terrain.
     /// Détecte le clic le plus proche d'une intersection de la grille et ajoute un point si :
-    /// - Le clic est suffisamment proche d'une intersection (tolérance = 25 pixels)
+    /// - Le clic est suffisamment proche d'une intersection (tolérance configurable)
     /// - Le point n'a pas déjà été cliqué
-    /// - Le point ne se trouve pas sur une limite de frontière
     /// - Le point est dans la zone valide de la grille
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
         if (game)
         {
+            // Utiliser les paramètres de GameConfig pour flexibilité
+            int tolerance = GameConfig.ClickTolerance;
+            int gridSize = GameConfig.GridSize;
 
-            // Tolérance pour détecter les clics proches d'un point d'intersection
-            int tolerance = 25;
-            int gridSize = 50;
             // Trouver l'intersection la plus proche
             int nearestX = (int)Math.Round(e.X / (double)gridSize) * gridSize;
             int nearestY = (int)Math.Round(e.Y / (double)gridSize) * gridSize;
+
             // Vérifier si le clic est suffisamment proche de cette intersection
             if (Math.Abs(e.X - nearestX) <= tolerance && Math.Abs(e.Y - nearestY) <= tolerance)
             {
@@ -423,37 +423,37 @@ partial class Window
     /// <summary>
     /// Dessine la grille de jeu et tous les points cliqués par les joueurs.
     /// Responsabilités :
-    /// - Trace les lignes verticales et horizontales (espacement de 50 pixels)
+    /// - Trace les lignes verticales et horizontales (espacement configurable)
     /// - Affiche chaque point avec sa couleur (rouge ou bleu selon le joueur)
     /// - Met à jour les indicateurs de couleur dans les labels de score
     /// - Vérifie si le nombre maximum de points est atteint (CheckPoint)
     /// OPTIMISÉ : Double buffering activé pour réduire le flickering
     /// </summary>
     private void paint(object sender, PaintEventArgs e){
-
-    // Objet graphics du panneau
         Graphics graph = e.Graphics;
-
-        // Activer l'anti-aliasing pour un rendu plus lisse
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-    // Définition de l'élément pour dessiner la ligne
+        // Utiliser la taille de grille paramétrable
+        int gridSize = GameConfig.GridSize;
         Pen BlackPen = new Pen(Color.Black, 2);
-    // Définition des lignes verticales
-        for(int i = 50; i < space.Width; i += 50){
-            graph.DrawLine(BlackPen, i, 0 , i, space.Height);
+
+        // Tracer les lignes verticales
+        for(int i = gridSize; i < space.Width; i += gridSize){
+            graph.DrawLine(BlackPen, i, 0, i, space.Height);
         }
-    // Définition des lignes horizontales
-        for(int j = 50; j < space.Height; j += 50){
+
+        // Tracer les lignes horizontales
+        for(int j = gridSize; j < space.Height; j += gridSize){
             graph.DrawLine(BlackPen, 0, j, space.Width, j);
         }
-    // Dessiner les points colorés aux emplacements cliqués
+
+        // Dessiner les points colorés aux emplacements cliqués
         if (maxPoint != 0) CheckPoint();
-        int k = !inversed ?  0 : 1;
+        int k = !inversed ? 0 : 1;
 
         foreach (var point in clickedPoints)
         {
-            if( k % 2 == 0){
+            if(k % 2 == 0){
                 graph.FillEllipse(Brushes.Red, point.X - 5, point.Y - 5, 10, 10);
                 label1.BackColor = Color.White;
                 label2.BackColor = Color.Blue;
@@ -471,30 +471,32 @@ partial class Window
     /// Dessine les lignes entre les points et détecte la victoire d'un joueur.
     /// Responsabilités :
     /// - Passe la liste des points cliqués à la classe Line
-    /// - Vérifie si le joueur 1 a un alignement gagnant (5 points alignés)
+    /// - Vérifie si le joueur 1 a un alignement gagnant
     /// - Vérifie si le joueur 2 a un alignement gagnant
     /// - Appelle la fonction de dessin du joueur vainqueur et arrête le jeu
+    /// Le nombre de points pour la victoire est paramétrable via GameConfig.PointsToWin
     /// OPTIMISÉ : Bénéficie du double buffering et mise en cache des calculs
     /// </summary>
     public void Draw(object sender, PaintEventArgs e){
-    // Objet graphics du panneau
         Graphics graph = e.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
+        // Mettre à jour la liste des points dans la classe Line
         Line.ClickedPoints = clickedPoints;
 
-        if(player1.has(5) ){
+        // Vérifier si joueur 1 a gagné (nombre de points configurable)
+        if(player1.has(GameConfig.PointsToWin)){
             player1.paint(sender, e);
             game = false;
             return;
         }
-        if(player2.has(5)){
+
+        // Vérifier si joueur 2 a gagné (nombre de points configurable)
+        if(player2.has(GameConfig.PointsToWin)){
             player2.paint(sender, e);
             game = false;
             return;
         }
-
-
     }
 
 }
