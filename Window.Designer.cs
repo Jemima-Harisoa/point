@@ -54,19 +54,17 @@ partial class Window
         Score.Dock = DockStyle.Top;
         Score.Controls.Add(scoreTable(player1.nom, player2.nom));
         Score.PerformLayout();
-        //LeftInterface
+        //LeftInterface - Boutons de suggestion désactivés pour l'instant
         LeftInterface.Width = 150;
         LeftInterface.Dock = DockStyle.Left;
-        Button control1 = Suggest(player1, player2);
-        
-        LeftInterface.Controls.Add(control1);
-       
-        //RightInterface
+        // Button control1 = Suggest(player1, player2);
+        // LeftInterface.Controls.Add(control1);
+
+        //RightInterface - Boutons de suggestion désactivés pour l'instant
         RightInterface.Width = 150;
         RightInterface.Dock = DockStyle.Right;
-        Button control2 = Suggest(player2, player1);
-
-        RightInterface.Controls.Add(control2);
+        // Button control2 = Suggest(player2, player1);
+        // RightInterface.Controls.Add(control2);
 
         //Menu
         Menu.Height = 150;
