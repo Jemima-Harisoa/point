@@ -81,7 +81,15 @@ partial class Window
         this.Controls.Add(RightInterface);
         this.Controls.Add(Menu);
         Line.Limit(space);
-        
+
+        // Ajouter un gestionnaire pour redessiner la grille quand la fenêtre change de taille
+        this.Resize += (sender, e) => {
+            if(space != null && space.Width > 0 && space.Height > 0)
+            {
+                GameConfig.UpdateGridSize(space.Width, space.Height);
+                space.Invalidate(); // Redessiner le panneau avec la nouvelle taille
+            }
+        };
     }
 
     /// <summary>
