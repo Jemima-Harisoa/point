@@ -19,4 +19,6 @@ jobs:
           COMMITS=$(git log origin/main..HEAD --oneline)
           BODY=$(gh pr view ${{ github.event.pull_request.number }} -t '{{ .body }}')
           NEW_BODY="$BODY
-
+          gh pr edit ${{ github.event.pull_request.number }} --body "$NEW_BODY"
+        env:
+          GH_TOKEN: ${{ github.token }}
