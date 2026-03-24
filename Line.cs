@@ -116,13 +116,15 @@ namespace point
                 {
                     int orientation  = i;
                     Point ajout  = Equation(orientation, externe); // on recupère les points externe suivant l'orientation de la ligne
-                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) {
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0
+                        && ajout.X < _limit[1].X && ajout.Y < _limit[1].Y) {
                         Suggestion.Add(ajout);
                         SuggestionSet.Add(ajout);
                     }
                     orientation = -orientation; // Changer l'orientation
                     ajout = Equation(orientation, externe);
-                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) {
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0
+                        && ajout.X < _limit[1].X && ajout.Y < _limit[1].Y) {
                         Suggestion.Add(ajout);
                         SuggestionSet.Add(ajout);
                     }
@@ -259,6 +261,14 @@ namespace point
         public List<Point> Liste(int nombre){
         List<List<Point>> Liste = new List<List<Point>>();
 
+        // Chercher d'abord dans les lignes droites (horizontales/verticales)
+        List<List<Point>> lignesDroites = getLineList();
+        foreach (var val in lignesDroites)
+        {
+            if(val.Count == nombre) return val;
+        }
+
+        // Si pas de ligne droite, chercher dans les lignes en L
         foreach (var item in Intersect())
         {
             List<List<Point>> list =  Intersection(item);
@@ -269,7 +279,7 @@ namespace point
             }
 
         }
-        return new List<Point>();   
+        return new List<Point>();
     }
 
     /// <summary>
@@ -389,6 +399,42 @@ namespace point
         public static bool VerticalOrHorizontal(List<Point> points){
             if(isHorizontal(points) || isVertical(points)) return true;
             return false;
+        }
+
+        /// <summary>
+        /// Vérifie si une liste de points forme une ligne diagonale.
+        /// Une ligne diagonale a un ratio X/Y constant (diagonale croissante ou décroissante).
+        /// </summary>
+        /// <param name="points">Liste de points à vérifier</param>
+        /// <returns>true si les points forment une diagonale</returns>
+        public static bool isDiagonal(List<Point> points){
+            if(points.Count < 2) return false;
+
+            // Calculer le ratio entre deltaX et deltaY pour les deux premiers points
+            Point p1 = points[0];
+            Point p2 = points[1];
+            int deltaX = p2.X - p1.X;
+            int deltaY = p2.Y - p1.Y;
+
+            // Une diagonale a |deltaX| == |deltaY|
+            if(Math.Abs(deltaX) != Math.Abs(deltaY)) return false;
+
+            // Vérifier que tous les autres points suivent le même ratio
+            for (int i = 1; i < points.Count - 1; i++)
+            {
+                Point current = points[i];
+                Point next = points[i + 1];
+                int dx = next.X - current.X;
+                int dy = next.Y - current.Y;
+
+                // Tous les segments doivent avoir le même ratio
+                if(Math.Abs(dx) != Math.Abs(dy)) return false;
+                // La direction doit être cohérente
+                if(deltaX != 0 && dx != 0 && (deltaX * dx < 0)) return false;
+                if(deltaY != 0 && dy != 0 && (deltaY * dy < 0)) return false;
+            }
+
+            return true;
         }
         /// <summary>
         /// Vérifie si une liste de points forme une ligne horizontale purem (tous même Y).

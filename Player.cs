@@ -37,6 +37,7 @@ public class Player
     /// Dessine les lignes gagnantes du joueur sur le terrain.
     /// Récupère la configuration gagnante (5 points alignés) et dessine :
     /// - Pour une ligne droite (vertical/horizontal) : une seule ligne du premier au dernier point
+    /// - Pour une diagonale : une seule ligne du premier au dernier point
     /// - Pour une forme en L : deux lignes perpendiculaires passant par le point d'intersection
     /// OPTIMISÉ : Bénéficie du cache de Line.Liste() et double buffering
     /// </summary>
@@ -53,6 +54,14 @@ public class Player
         if(Line.VerticalOrHorizontal(ligne))
         {
             // Pour une ligne droite : dessiner du premier au dernier point
+            Point premier = ligne[0];
+            Point dernier = ligne[ligne.Count - 1];
+            graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
+        }
+        // Vérifier si c'est une diagonale
+        else if(Line.isDiagonal(ligne))
+        {
+            // Pour une diagonale : dessiner du premier au dernier point
             Point premier = ligne[0];
             Point dernier = ligne[ligne.Count - 1];
             graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);

@@ -355,12 +355,13 @@ partial class Window
     /// - Le clic est suffisamment proche d'une intersection (tolérance = 25 pixels)
     /// - Le point n'a pas déjà été cliqué
     /// - Le point ne se trouve pas sur une limite de frontière
+    /// - Le point est dans la zone valide de la grille
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
         if (game)
         {
-           
+
             // Tolérance pour détecter les clics proches d'un point d'intersection
             int tolerance = 25;
             int gridSize = 50;
@@ -371,10 +372,13 @@ partial class Window
             if (Math.Abs(e.X - nearestX) <= tolerance && Math.Abs(e.Y - nearestY) <= tolerance)
             {
                 Point p = new Point(nearestX, nearestY);
-              
-                if(!clickedPoints.Contains(p) && !Line.isLimit(p)){
+
+                // Vérifier que le point est dans les limites valides de la grille
+                if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
+                    && !clickedPoints.Contains(p))
+                {
                     add(p);
-                } 
+                }
             }
         }
     } 
@@ -410,7 +414,7 @@ partial class Window
     private void add(Point p){
         tour++;
         clickedPoints.Add(p);
-        space.Paint += Draw; // Ajouter le point d'intersection le plus proche
+        Line.ClickedPoints = clickedPoints; // Mettre à jour immédiatement pour éviter le retard et invalider les caches
         _isDirty = true; // Marquer qu'on doit redessiner
         space.Invalidate(); // Déclencher le redessin du panneau
     } 

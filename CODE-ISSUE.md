@@ -44,14 +44,9 @@ Pour 500 points: ~250 000 opérations
 ---
 
 
-## Solutions Proposées
-
-**Voici comment optimiser drastiquement** (gain: 5-10x plus rapide):
-
-1. **Ajouter un système de cache** avec invalidation
-2. **Utiliser `HashSet<Point>`** au lieu de `List<Point>.Contains()`
-3. **Optimiser `getLineList()`** - limiter les recalculs
-4. **Pre-calculer les suggestions** au lieu de les recalculer à chaque clic
-5. **Double buffering** pour paint/draw
-6. **Limiter les appels à paint/draw** avec un drapeau `isDirty`
-
+## Bug identifie : 
+- Les ligne en diagonal ne sont pas paint correctement 
+- Les suggestions de point ne redconnaissent pas les ligne en L quand elle on une formation U 
+- La detection du L prend du retard pour la condition gagnante
+- Il y a des intersections ou on a peut pas ajouter de point quand bien meme qu'il y a pas de point dessus 
+-  
