@@ -1,0 +1,22 @@
+name: Auto-add commits to PR
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  add-commits:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get commits and update PR
+        run: |
+          COMMITS=$(git log origin/main..HEAD --oneline)
+          BODY=$(gh pr view ${{ github.event.pull_request.number }} -t '{{ .body }}')
+          NEW_BODY="$BODY
+

@@ -52,9 +52,9 @@ Pour 500 points: ~250 000 opérations
 - Il y a des intersections ou on a peut pas ajouter de point quand bien meme qu'il y a pas de point dessus 
 
 # Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L
-- [] Simplifier la logique du jeu victoire si n point aligne en ligne droite 
-- [] Commenter les point de suggestion  
-- [] Parametrer le nombre de ligne et colonne ainsi que le nombre de ligne a aligner pour dire que le joueur a gagner avec le modal de depart 
+- [x] Simplifier la logique du jeu victoire si n point aligne en ligne droite
+- [x] Commenter les boutons de suggestion
+- [x] Parametrer le nombre de ligne et colonne ainsi que le nombre de ligne a aligner pour dire que le joueur a gagner (defaut 5) avec le modal de depart 
 
 
 

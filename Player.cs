@@ -35,22 +35,26 @@ public class Player
     }
     /// <summary>
     /// Dessine les lignes gagnantes du joueur sur le terrain.
-    /// Récupère la configuration gagnante (5 points alignés) et dessine :
-    /// - Pour une ligne droite (vertical/horizontal) : une seule ligne du premier au dernier point
-    /// - Pour une diagonale : une seule ligne du premier au dernier point
-    /// - Pour une forme en L : deux lignes perpendiculaires passant par le point d'intersection
+    /// Rendu activé pour:
+    /// - Lignes droites (verticales/horizontales)
+    /// - Diagonales
+    ///
+    /// DÉSACTIVÉ TEMPORAIREMENT:
+    /// - Formations en L (le code reste en place pour réactivation future)
+    ///
     /// OPTIMISÉ : Bénéficie du cache de Line.Liste() et double buffering
     /// </summary>
     public void paint(object sender, PaintEventArgs paint){
         Graphics graph = paint.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-        List<Point> ligne = line.Liste(5);
+        // Utiliser le nombre de points configuré dans GameConfig, pas valeur fixe
+        List<Point> ligne = line.Liste(GameConfig.PointsToWin);
         if(ligne.Count == 0) return; // Aucune ligne gagnante trouvée
 
-        Pen Pen = new Pen(color,5);
+        Pen Pen = new Pen(color, 5);
 
-        // Vérifier si c'est une ligne droite (verticale ou horizontale)
+        // Cas 1: Ligne droite (verticale ou horizontale)
         if(Line.VerticalOrHorizontal(ligne))
         {
             // Pour une ligne droite : dessiner du premier au dernier point
@@ -58,7 +62,7 @@ public class Player
             Point dernier = ligne[ligne.Count - 1];
             graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
         }
-        // Vérifier si c'est une diagonale
+        // Cas 2: Diagonale (ligne inclinée)
         else if(Line.isDiagonal(ligne))
         {
             // Pour une diagonale : dessiner du premier au dernier point
@@ -66,14 +70,20 @@ public class Player
             Point dernier = ligne[ligne.Count - 1];
             graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
         }
+        // Cas 3: Formation L - DÉSACTIVÉE TEMPORAIREMENT
+        // Le code reste en place pour réactivation future
         else
         {
-            // Pour une forme en L : dessiner les deux lignes perpendiculaires
+            // Les formations en L sont pour l'instant ignorées
+            // Code conservé pour réactivation:
+            /*
             Point intersection = line.Intersection(ligne);
-            Point ExtremityVertical = line.Extremity( ligne, intersection, true);
-            Point ExtremityHorizontal = line.Extremity( ligne, intersection, false);
+            Point ExtremityVertical = line.Extremity(ligne, intersection, true);
+            Point ExtremityHorizontal = line.Extremity(ligne, intersection, false);
             graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityVertical.X, ExtremityVertical.Y);
             graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityHorizontal.X, ExtremityHorizontal.Y);
+            */
+            return;  // Ne pas dessiner les L-shapes pour l'instant
         }
     }
     /// <summary>
@@ -158,15 +168,19 @@ public class Player
 
     /// <summary>
     /// Vérifie si le joueur possède une formation avec un nombre donné de points alignés.
-    /// Recherche dans deux types de configurations :
-    /// - Les lignes en L (LShapeLine) : deux lignes perpendiculaires se croisant
-    /// - Les lignes droites (getLineList) : points alignés verticalement ou horizontalement
+    /// Recherche UNIQUEMENT dans les lignes droites (verticales/horizontales/diagonales).
+    /// Les formations en L sont désactivées pour l'instant.
     /// </summary>
     /// <param name="nombre">Le nombre de points à vérifier (3, 4, ou 5)</param>
-    /// <returns>true si le joueur possède une formation avec au moins 'nombre' points</returns>
+    /// <returns>true si le joueur possède une formation droite avec au moins 'nombre' points</returns>
     public bool has(int nombre){
-        if(line.line(nombre, line.LShapeLine()).Count > 0 ) return true;
+        // Vérifier SEULEMENT les lignes droites (vertical/horizontal/diagonal)
+        // Les L-shapes sont gardés en code mais désactivés pour l'instant
         if(line.line(nombre, line.getLineList()).Count > 0 ) return true;
+
+        // DÉSACTIVÉ: Les formations en L
+        // if(line.line(nombre, line.LShapeLine()).Count > 0 ) return true;
+
         else return false;
     }
 

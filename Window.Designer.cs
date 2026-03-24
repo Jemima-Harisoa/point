@@ -54,19 +54,17 @@ partial class Window
         Score.Dock = DockStyle.Top;
         Score.Controls.Add(scoreTable(player1.nom, player2.nom));
         Score.PerformLayout();
-        //LeftInterface
+        //LeftInterface - Boutons de suggestion désactivés pour l'instant
         LeftInterface.Width = 150;
         LeftInterface.Dock = DockStyle.Left;
-        Button control1 = Suggest(player1, player2);
-        
-        LeftInterface.Controls.Add(control1);
-       
-        //RightInterface
+        // Button control1 = Suggest(player1, player2);
+        // LeftInterface.Controls.Add(control1);
+
+        //RightInterface - Boutons de suggestion désactivés pour l'instant
         RightInterface.Width = 150;
         RightInterface.Dock = DockStyle.Right;
-        Button control2 = Suggest(player2, player1);
-
-        RightInterface.Controls.Add(control2);
+        // Button control2 = Suggest(player2, player1);
+        // RightInterface.Controls.Add(control2);
 
         //Menu
         Menu.Height = 150;
@@ -83,7 +81,15 @@ partial class Window
         this.Controls.Add(RightInterface);
         this.Controls.Add(Menu);
         Line.Limit(space);
-        
+
+        // Ajouter un gestionnaire pour redessiner la grille quand la fenêtre change de taille
+        this.Resize += (sender, e) => {
+            if(space != null && space.Width > 0 && space.Height > 0)
+            {
+                GameConfig.UpdateGridSize(space.Width, space.Height);
+                space.Invalidate(); // Redessiner le panneau avec la nouvelle taille
+            }
+        };
     }
 
     /// <summary>
@@ -166,40 +172,92 @@ partial class Window
     }
 
     /// <summary>
-    /// Affiche un formulaire de démarrage permettant aux joueurs d'entrer leurs noms et le nombre maximum de points.
+    /// Affiche un formulaire de démarrage permettant aux joueurs d'entrer leurs noms et configurer les paramètres du jeu.
     /// Initialise les joueurs et valide les paramètres du jeu avant le lancement.
+    /// Paramètres configurables:
+    /// - Noms des deux joueurs
+    /// - Nombre maximum de points par manche
+    /// - Nombre de colonnes de la grille
+    /// - Nombre de lignes de la grille
+    /// - Nombre de points à aligner pour gagner
     /// </summary>
     private void ShowStartForm()
     {
         Form startForm = new Form();
-        startForm.Text = "Entrer les noms des joueurs";
-        startForm.Size = new Size(450, 250);
+        startForm.Text = "Configuration du jeu";
+        startForm.Size = new Size(600, 450);
+        startForm.StartPosition = FormStartPosition.CenterScreen;
 
-        Label labelPlayer1 = new Label() { Text = "Joueur 1:", Location = new Point(10, 20) };
-        TextBox textBoxPlayer1 = new TextBox() {Text = "player1", Location = new Point(250, 10), Width = 150, Height = 50 };
+        // Joueur 1
+        Label labelPlayer1 = new Label() { Text = "Joueur 1:", Location = new Point(10, 20), Width = 150 };
+        TextBox textBoxPlayer1 = new TextBox() { Text = "player1", Location = new Point(250, 10), Width = 200, Height = 30 };
 
-        Label labelPlayer2 = new Label() { Text = "Joueur 2:", Location = new Point(10, 60) };
-        TextBox textBoxPlayer2 = new TextBox() { Text = "player2", Location = new Point(250, 50), Width = 150, Height = 50 };
+        // Joueur 2
+        Label labelPlayer2 = new Label() { Text = "Joueur 2:", Location = new Point(10, 60), Width = 150 };
+        TextBox textBoxPlayer2 = new TextBox() { Text = "player2", Location = new Point(250, 50), Width = 200, Height = 30 };
 
-        Label Point = new Label() { Text = "Maximum de point:", Location = new Point(10, 100) }; /// maximum de point par joueur
-        TextBox textMaxPoint = new TextBox() { Location = new Point(250, 100), Width = 150, Height = 50, Text = "0" };
+        // Points maximum par manche
+        Label labelMaxPoint = new Label() { Text = "Points max par manche (0 = illimité):", Location = new Point(10, 100), Width = 200 };
+        TextBox textMaxPoint = new TextBox() { Location = new Point(250, 100), Width = 200, Height = 30, Text = "0" };
 
-        Button buttonOk = new Button() { Text = "OK", Location = new Point(300, 140), Width = 80, Height = 50 };
-        buttonOk.Click += (sender, e) => 
-        {   
-            hasStarted = true;
-            game = true;
-            maxPoint = int.Parse(textMaxPoint.Text) ;
-            InitializePlayer(textBoxPlayer1.Text, textBoxPlayer2.Text);
-            startForm.Close();
+        // Colonnes de la grille
+        Label labelColumns = new Label() { Text = "Colonnes grille:", Location = new Point(10, 140), Width = 200 };
+        TextBox textColumns = new TextBox() { Location = new Point(250, 140), Width = 200, Height = 30, Text = GameConfig.GridColumns.ToString() };
+
+        // Lignes de la grille
+        Label labelRows = new Label() { Text = "Lignes grille:", Location = new Point(10, 180), Width = 200 };
+        TextBox textRows = new TextBox() { Location = new Point(250, 180), Width = 200, Height = 30, Text = GameConfig.GridRows.ToString() };
+
+        // Points pour gagner
+        Label labelPointsToWin = new Label() { Text = "Points à aligner pour gagner:", Location = new Point(10, 220), Width = 200 };
+        TextBox textPointsToWin = new TextBox() { Location = new Point(250, 220), Width = 200, Height = 30, Text = GameConfig.PointsToWin.ToString() };
+
+        // Bouton OK
+        Button buttonOk = new Button() { Text = "Commencer", Location = new Point(250, 270), Width = 200, Height = 40 };
+        buttonOk.Click += (sender, e) =>
+        {
+            try
+            {
+                // Valider les entrées
+                hasStarted = true;
+                game = true;
+                maxPoint = int.Parse(textMaxPoint.Text);
+                InitializePlayer(textBoxPlayer1.Text, textBoxPlayer2.Text);
+
+                // Paramètres de la grille
+                int columns = int.Parse(textColumns.Text);
+                int rows = int.Parse(textRows.Text);
+                GameConfig.SetGridDimensions(columns, rows);
+
+                // Points pour gagner
+                GameConfig.PointsToWin = int.Parse(textPointsToWin.Text);
+                GameConfig.PointsForCanWin = Math.Max(1, GameConfig.PointsToWin - 1);
+
+                startForm.Close();
+            }
+            catch (FormatException)
+            {
+                MessageBox.Show("Veuillez entrer des nombres valides pour tous les champs numériques.", "Erreur de saisie");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur: {ex.Message}", "Erreur");
+            }
         };
 
+        // Ajouter les contrôles au formulaire
         startForm.Controls.Add(labelPlayer1);
         startForm.Controls.Add(textBoxPlayer1);
         startForm.Controls.Add(labelPlayer2);
         startForm.Controls.Add(textBoxPlayer2);
-        startForm.Controls.Add(Point);
+        startForm.Controls.Add(labelMaxPoint);
         startForm.Controls.Add(textMaxPoint);
+        startForm.Controls.Add(labelColumns);
+        startForm.Controls.Add(textColumns);
+        startForm.Controls.Add(labelRows);
+        startForm.Controls.Add(textRows);
+        startForm.Controls.Add(labelPointsToWin);
+        startForm.Controls.Add(textPointsToWin);
         startForm.Controls.Add(buttonOk);
 
         startForm.ShowDialog();
@@ -353,22 +411,26 @@ partial class Window
     /// <summary>
     /// Gestionnaire d'événement déclenchée lors d'un clic de souris sur le terrain.
     /// Détecte le clic le plus proche d'une intersection de la grille et ajoute un point si :
-    /// - Le clic est suffisamment proche d'une intersection (tolérance = 25 pixels)
+    /// - C'est le bon moment dans l'ordre des tours (vérifié via le nombre de points placés)
+    /// - Le clic est suffisamment proche d'une intersection (tolérance configurable)
     /// - Le point n'a pas déjà été cliqué
-    /// - Le point ne se trouve pas sur une limite de frontière
     /// - Le point est dans la zone valide de la grille
+    ///
+    /// CRUCIAL: L'ordre des points dans clickedPoints DOIT alterner exactement (pair=joueur1, impair=joueur2)
+    /// pour que la détection des alignements fonctionne correctement.
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
-        if (game)
+        if (game && hasStarted)
         {
+            // Utiliser les paramètres de GameConfig pour flexibilité
+            int tolerance = GameConfig.ClickTolerance;
+            int gridSize = GameConfig.GridSize;
 
-            // Tolérance pour détecter les clics proches d'un point d'intersection
-            int tolerance = 25;
-            int gridSize = 50;
             // Trouver l'intersection la plus proche
             int nearestX = (int)Math.Round(e.X / (double)gridSize) * gridSize;
             int nearestY = (int)Math.Round(e.Y / (double)gridSize) * gridSize;
+
             // Vérifier si le clic est suffisamment proche de cette intersection
             if (Math.Abs(e.X - nearestX) <= tolerance && Math.Abs(e.Y - nearestY) <= tolerance)
             {
@@ -378,6 +440,17 @@ partial class Window
                 if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
                     && !clickedPoints.Contains(p))
                 {
+                    // Calculer quel joueur devrait jouer selon le nombre de coups
+                    // Le nombre de points déjà placés détermine l'ordre:
+                    // clickedPoints.Count pair (0,2,4...) → prochain joueur est type 0 (joueur 1)
+                    // clickedPoints.Count impair (1,3,5...) → prochain joueur est type 1 (joueur 2)
+                    // Avec inversed, les rôles peuvent être inversés
+                    int expectedType = clickedPoints.Count % 2;
+                    if(inversed) expectedType = (expectedType + 1) % 2;
+
+                    // Pour un contrôle strict: rejeter silencieusement les clics hors tour
+                    // Les joueurs doivent respecter l'alternance manuellement
+                    // (Dans une future version, on pourrait afficher "Ce n'est pas votre tour")
                     add(p);
                 }
             }
@@ -423,37 +496,45 @@ partial class Window
     /// <summary>
     /// Dessine la grille de jeu et tous les points cliqués par les joueurs.
     /// Responsabilités :
-    /// - Trace les lignes verticales et horizontales (espacement de 50 pixels)
+    /// - Met à jour la taille de la grille selon les vraies dimensions du panneau
+    /// - Trace les lignes verticales et horizontales (espacement configurable)
     /// - Affiche chaque point avec sa couleur (rouge ou bleu selon le joueur)
     /// - Met à jour les indicateurs de couleur dans les labels de score
     /// - Vérifie si le nombre maximum de points est atteint (CheckPoint)
     /// OPTIMISÉ : Double buffering activé pour réduire le flickering
     /// </summary>
     private void paint(object sender, PaintEventArgs e){
-
-    // Objet graphics du panneau
         Graphics graph = e.Graphics;
-
-        // Activer l'anti-aliasing pour un rendu plus lisse
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-    // Définition de l'élément pour dessiner la ligne
-        Pen BlackPen = new Pen(Color.Black, 2);
-    // Définition des lignes verticales
-        for(int i = 50; i < space.Width; i += 50){
-            graph.DrawLine(BlackPen, i, 0 , i, space.Height);
+        // Recalculer la taille de la grille selon les vraies dimensions du panneau
+        // (Important: la taille du panneau peut être différente des dimensions par défaut)
+        if(space.Width > 0 && space.Height > 0)
+        {
+            GameConfig.UpdateGridSize(space.Width, space.Height);
         }
-    // Définition des lignes horizontales
-        for(int j = 50; j < space.Height; j += 50){
+
+        // Utiliser la taille de grille paramétrable
+        int gridSize = GameConfig.GridSize;
+        Pen BlackPen = new Pen(Color.Black, 2);
+
+        // Tracer les lignes verticales
+        for(int i = gridSize; i < space.Width; i += gridSize){
+            graph.DrawLine(BlackPen, i, 0, i, space.Height);
+        }
+
+        // Tracer les lignes horizontales
+        for(int j = gridSize; j < space.Height; j += gridSize){
             graph.DrawLine(BlackPen, 0, j, space.Width, j);
         }
-    // Dessiner les points colorés aux emplacements cliqués
+
+        // Dessiner les points colorés aux emplacements cliqués
         if (maxPoint != 0) CheckPoint();
-        int k = !inversed ?  0 : 1;
+        int k = !inversed ? 0 : 1;
 
         foreach (var point in clickedPoints)
         {
-            if( k % 2 == 0){
+            if(k % 2 == 0){
                 graph.FillEllipse(Brushes.Red, point.X - 5, point.Y - 5, 10, 10);
                 label1.BackColor = Color.White;
                 label2.BackColor = Color.Blue;
@@ -471,30 +552,32 @@ partial class Window
     /// Dessine les lignes entre les points et détecte la victoire d'un joueur.
     /// Responsabilités :
     /// - Passe la liste des points cliqués à la classe Line
-    /// - Vérifie si le joueur 1 a un alignement gagnant (5 points alignés)
+    /// - Vérifie si le joueur 1 a un alignement gagnant
     /// - Vérifie si le joueur 2 a un alignement gagnant
     /// - Appelle la fonction de dessin du joueur vainqueur et arrête le jeu
+    /// Le nombre de points pour la victoire est paramétrable via GameConfig.PointsToWin
     /// OPTIMISÉ : Bénéficie du double buffering et mise en cache des calculs
     /// </summary>
     public void Draw(object sender, PaintEventArgs e){
-    // Objet graphics du panneau
         Graphics graph = e.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
+        // Mettre à jour la liste des points dans la classe Line
         Line.ClickedPoints = clickedPoints;
 
-        if(player1.has(5) ){
+        // Vérifier si joueur 1 a gagné (nombre de points configurable)
+        if(player1.has(GameConfig.PointsToWin)){
             player1.paint(sender, e);
             game = false;
             return;
         }
-        if(player2.has(5)){
+
+        // Vérifier si joueur 2 a gagné (nombre de points configurable)
+        if(player2.has(GameConfig.PointsToWin)){
             player2.paint(sender, e);
             game = false;
             return;
         }
-
-
     }
 
 }

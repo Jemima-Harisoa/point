@@ -15,7 +15,7 @@
 - Restructurer le code pour améliorer sa lisibilité et sa maintenabilité.
     - [X] Ajout de commentaires pour expliquer les différentes parties du code.
     - [X] Alleger le contenu du code que ce soint moins lourd et plus facile à faire tourner. 
-- [] Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L (On ne supprime rien on empeche les regle qui ) 
+- [X] Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L (On ne supprime rien on empeche les regle qui ) 
 
 
 ### [] Classe missile : 
