@@ -57,6 +57,204 @@ Pour 500 points: ~250 000 opérations
 - [x] Parametrer le nombre de ligne et colonne ainsi que le nombre de ligne a aligner pour dire que le joueur a gagner (defaut 5) avec le modal de depart 
 
 
+# TODO — Feature Missile
+
+## Statut global
+
+| Tâche | Statut |
+|---|---|
+| Input colonnes/lignes dans ShowStartForm | ✅ Fait |
+| Classe `Missile` | ⬜ À faire |
+| Intégration dans le tour de jeu | ⬜ À faire |
+| UI barre de lancement (`MissileBar`) | ⬜ À faire |
+| Gestion des collisions et destruction | ⬜ À faire |
+
+---
+
+## ✅ Ajouter un input pour paramétrer colonnes/lignes — FAIT
+> Déjà implémenté dans `ShowStartForm()` dans `Window_Designer.cs`
+
+---
+
+## ✅ 1. Créer `Missile.cs` (nouveau fichier)
+
+Créer le fichier `Missile.cs` dans le projet, namespace `point`.
+
+### ✅ 1.1 Créer l'enum `MissileState`
+En dehors de la classe, dans le même fichier :
+```csharp
+public enum MissileState { Ready, Flying, Destroyed }
+```
+
+### ✅ 1.2 Propriétés de la classe `Missile`
+
+| Propriété | Type | Description |
+|---|---|---|
+| `Position` | `Point` | Case de départ sur la grille (alignée sur `GameConfig.GridSize`) |
+| `Power` | `int` | Puissance de 1 à 5 — nombre de cases parcourues |
+| `State` | `MissileState` | État courant : `Ready`, `Flying`, `Destroyed` |
+| `Direction` | `int` | Direction de vol — reprend les valeurs de `Line.Equation()` : `1`=vertical, `2`=horizontal, `3`=diagonale croissante, `4`=diagonale décroissante |
+| `OwnerColor` | `Color` | Couleur du joueur propriétaire, pour le rendu |
+| `Trajectory` | `List<Point>` | Liste des cases traversées, calculée au lancement — privée |
+
+### ✅ 1.3 Méthodes
+
+**`void Launch(Point from, int direction, int power)`**
+- Assigne `Position`, `Direction`, `Power`
+- Calcule `Trajectory` : boucle `power` fois en appelant `Equation(direction, point)` sur chaque point successif
+  - `Equation` est `private` dans `Line` → la dupliquer dans `Missile` en `private static Point Step(int dir, Point p, int gridSize)`, même logique
+- Met `State = MissileState.Flying`
+
+**`List<Point> GetTrajectory()`**
+- Retourne une copie de `Trajectory` (lecture seule pour l'extérieur)
+
+**`bool CheckCollision(List<Point> enemyPoints)`**
+- Parcourt `Trajectory`
+- Si un point de la trajectoire est dans `enemyPoints` → retourne `true`
+- Sinon → retourne `false`
+- Ne modifie pas encore la liste (la suppression se fait dans `Window_Designer`)
+
+**`void paint(object sender, PaintEventArgs e)`**
+- Si `State == Flying` :
+  - Dessiner une ligne de `Position` jusqu'au dernier point de `Trajectory` avec un `Pen` de la couleur `OwnerColor`, épaisseur 3
+  - Dessiner une petite flèche ou cercle plein au bout de la trajectoire pour matérialiser l'impact
+- Si `State == Destroyed` :
+  - Dessiner un cercle orange/rouge centré sur le dernier point de `Trajectory`, rayon ~10px, semi-transparent (`Color.FromArgb(180, 255, 80, 0)`)
+- Si `State == Ready` : ne rien dessiner
+
+---
+
+## ✅ 2. Modifier `Player.cs`
+
+### ✅ 2.1 Ajouter les propriétés missiles
+```csharp
+public List<Missile> Missiles { get; private set; } = new List<Missile>();
+public bool HasLaunchedMissileThisTurn { get; set; } = false;
+```
+
+### ✅ 2.2 Ajouter la méthode `CreateMissile()`
+```csharp
+public Missile CreateMissile()
+// → instancie un new Missile avec OwnerColor = this.color
+// → l'ajoute à Missiles
+// → retourne le missile pour que Window_Designer puisse appeler Launch() dessus
+```
+
+### ✅ 2.3 Ajouter la méthode `ResetTurn()`
+```csharp
+public void ResetTurn()
+// → remet HasLaunchedMissileThisTurn = false
+// → à appeler dans Window_Designer au changement de tour
+```
+
+---
+
+## ✅ 3. Modifier `Window_Designer.cs`
+
+### ✅ 3.1 Ajouter la méthode `MissileBar(Player player, Player adversaire)`
+Retourne un `Panel` à insérer dans `LeftInterface` (joueur 1) et `RightInterface` (joueur 2).
+
+Contenu du panel :
+- `Label` : "Ligne de départ :"
+- `NumericUpDown` pour choisir la colonne de départ (min=1, max=`GameConfig.GridColumns - 1`)
+- `Label` : "Puissance (1–5) :"
+- `TrackBar` slider puissance (min=1, max=5, valeur initiale=3)
+- `Label` affichant la valeur du slider en temps réel
+- `Label` : "Direction :"
+- `ComboBox` avec les options : `Vertical`, `Horizontal`, `Diagonale ↗`, `Diagonale ↘` (mappe sur `1`, `2`, `3`, `4`)
+- `Button` "🚀 Lancer !"
+
+**Logique du bouton "Lancer !" :**
+1. Vérifier `tour % 2 == player.Order && game` — sinon ignorer
+2. Vérifier `!player.HasLaunchedMissileThisTurn` — sinon `MessageBox.Show("Déjà lancé ce tour")`
+3. Calculer `Position` : `new Point(colonne * GameConfig.GridSize, 0)` si vertical (à adapter selon direction choisie)
+4. Appeler `player.CreateMissile()`
+5. Appeler `missile.Launch(position, direction, power)`
+6. Appeler `missile.CheckCollision(adversaire.line.getSameColor())` — ⚠️ `getSameColor()` est `private` dans `Line`, voir note ci-dessous
+7. Si collision → appeler `RemoveEnemyPoint(point_touché, adversaire)` (voir 3.3)
+8. `player.HasLaunchedMissileThisTurn = true`
+9. `tour++`
+10. `adversaire.ResetTurn()`
+11. `_isDirty = true; space.Invalidate()`
+
+> ⚠️ **Note sur `getSameColor()`** : cette méthode est `private` dans `Line`. Il faudra soit la passer en `public`, soit ajouter une méthode publique `GetPlayerPoints()` dans `Line` qui la délègue. Préférer la deuxième option pour ne pas exposer trop l'intérieur de `Line`.
+
+### ✅ 3.2 Brancher `MissileBar` dans `InitializeComponent()`
+Remplacer les blocs commentés des boutons Suggest par :
+```csharp
+LeftInterface.Controls.Add(MissileBar(player1, player2));
+RightInterface.Controls.Add(MissileBar(player2, player1));
+```
+
+### ✅ 3.3 Ajouter `RemoveEnemyPoint(Point p, Player adversaire)`
+Méthode privée dans `Window_Designer` :
+- Recherche `p` dans `clickedPoints`
+- Trouver son index
+- **Problème clé** : supprimer le point casse l'alternance pair/impair qui identifie les joueurs
+- **Solution retenue** : remplacer le point par `Point.Empty` (ou `new Point(-1, -1)`) pour le "masquer" sans casser les index → à adapter dans `paint()` pour ignorer les `Point.Empty`
+
+### ✅ 3.4 Mettre à jour `space_MouseClick()`
+Ajouter en début de la condition `if (game && hasStarted)` :
+```csharp
+// Bloquer le clic si le joueur courant a déjà lancé un missile ce tour
+Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
+if (currentPlayer.HasLaunchedMissileThisTurn) return;
+```
+
+### ✅ 3.5 Mettre à jour `Draw()`
+Après les vérifications de victoire, ajouter :
+```csharp
+foreach (var missile in player1.Missiles)
+    missile.paint(sender, e);
+
+foreach (var missile in player2.Missiles)
+    missile.paint(sender, e);
+```
+
+### ✅ 3.6 Mettre à jour `restart()`
+Ajouter le nettoyage des missiles au restart :
+```csharp
+player1.Missiles.Clear();
+player2.Missiles.Clear();
+player1.HasLaunchedMissileThisTurn = false;
+player2.HasLaunchedMissileThisTurn = false;
+```
+
+---
+
+## ✅ 4. Modifier `Line.cs` (modification mineure)
+
+### ✅ 4.1 Exposer les points d'un joueur
+Ajouter une méthode publique pour que `MissileBar` puisse récupérer les points ennemis sans accéder à `getSameColor()` directement :
+```csharp
+public List<Point> GetPlayerPoints()
+{
+    return getSameColor(); // délègue simplement
+}
+```
+
+---
+
+## Ordre d'implémentation recommandé
+
+```
+1. Missile.cs         → isolé, zéro dépendance UI, testable seul
+2. Player.cs          → ajouter Missiles + méthodes, tester que ça compile
+3. Line.cs            → ajouter GetPlayerPoints(), 3 lignes
+4. Window_Designer    → MissileBar UI, brancher dans InitializeComponent
+5. Window_Designer    → RemoveEnemyPoint + mise à jour paint/Draw/restart
+```
+
+---
+
+## Points de vigilance
+
+| Risque | Détail |
+|---|---|
+| Alternance pair/impair cassée | Supprimer un point de `clickedPoints` décale tous les index suivants — utiliser `Point.Empty` en remplacement |
+| `getSameColor()` privée | Ne pas la rendre publique directement, ajouter `GetPlayerPoints()` |
+| `Equation()` privée dans `Line` | La dupliquer en `private static Step()` dans `Missile` — ne pas créer de couplage fort |
+| Missile hors grille | `Launch()` doit vérifier que chaque point de la trajectoire est dans les limites (`> 0` et `< Width/Height`) et stopper si on sort |
 
 
 
