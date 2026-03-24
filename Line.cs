@@ -29,6 +29,10 @@ namespace point
         private static Dictionary<int, List<List<Point>>> _cachedLineList = new Dictionary<int, List<List<Point>>>();
         private static Dictionary<int, List<List<Point>>> _cachedLShapeLine = new Dictionary<int, List<List<Point>>>();
 
+        // Cache pour optimiser Suggestion() et SuggestionL() - clé: (type * 10 + nombre)
+        private static Dictionary<int, List<Point>> _cachedSuggestion = new Dictionary<int, List<Point>>();
+        private static Dictionary<int, List<Point>> _cachedSuggestionL = new Dictionary<int, List<Point>>();
+
          // Constructeur
         public Line(int type)
         {
@@ -53,6 +57,8 @@ namespace point
                     _cachedIntersections = null;
                     _cachedLineList.Clear();
                     _cachedLShapeLine.Clear();
+                    _cachedSuggestion.Clear();
+                    _cachedSuggestionL.Clear();
                 }
             }
         }
@@ -79,34 +85,56 @@ namespace point
         /// - Explore 2 orientations (±1 selon l'axe X/Y)
         /// - Applique l'Equation pour obtenir les points suivants parallèles
         /// - Ajoute tous les points candidats qui ne sont pas déjà utilisés
+        /// OPTIMISÉ : Utilise un cache pour éviter de recalculer les suggestions
         /// </summary>
         /// <param name="nombre">Nombre de points dans la configuration L (3, 4, ou 5)</param>
         /// <returns>Liste de points de suggestion pour des formations en L</returns>
         public List<Point> SuggestionL(int nombre){
+        // Clé de cache unique basée sur type et nombre
+        int cacheKey = _type * 10 + nombre;
+        if (_cachedSuggestionL.ContainsKey(cacheKey))
+        {
+            return _cachedSuggestionL[cacheKey];
+        }
+
         List<Point> Suggestion = new List<Point>();
+        HashSet<Point> SuggestionSet = new HashSet<Point>(); // Pour éviter les doublons en O(1)
+        HashSet<Point> PointsSet = new HashSet<Point>(); // Pour les vérifications rapides
         List<List<Point>> LineList = LShapeLine();
         List<int> indice  = line(nombre, LineList);
         foreach (var index in indice)
         {
             List<Point> points = LineList[index];
+            PointsSet.Clear();
+            foreach (var p in points) PointsSet.Add(p);
+
             Point intersection = Intersection(points);
-            bool isVertical = true; 
-            do {  /// pour obtenir la valeur du point dans une orientation   
+            bool isVertical = true;
+            do {  /// pour obtenir la valeur du point dans une orientation
                 Point externe =  Extremity(LineList[index],intersection,isVertical);
-                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2  
+                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2
                 {
                     int orientation  = i;
                     Point ajout  = Equation(orientation, externe); // on recupère les points externe suivant l'orientation de la ligne
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout) && ajout.X > 0 && ajout.Y > 0  ) Suggestion.Add(ajout); 
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                     orientation = -orientation; // Changer l'orientation
                     ajout = Equation(orientation, externe);
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) Suggestion.Add(ajout);  
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                 }
                 isVertical = !isVertical;
-               
-                if(isVertical) break;   // quand l'orientation redevient true on arrête la boucle 
-            }while (true);     
+
+                if(isVertical) break;   // quand l'orientation redevient true on arrête la boucle
+            }while (true);
         }
+
+        // Mettre en cache et retourner
+        _cachedSuggestionL[cacheKey] = Suggestion;
         return  Suggestion;
     }
 
@@ -117,37 +145,55 @@ namespace point
         /// - Cherche les points extrêmes et les points adjacents
         /// - Suggère des points qui poursuivent la ligne dans les deux directions
         /// La logique évite les points déjà occupés.
+        /// OPTIMISÉ : Utilise un cache pour éviter de recalculer les suggestions
         /// </summary>
         /// <param name="nombre">Nombre de points dans la ligne (3, 4, ou 5)</param>
         /// <returns>Liste de points de suggestion pour des lignes droites</returns>
         public List<Point> Suggestion(int nombre){
+        // Clé de cache unique basée sur type et nombre
+        int cacheKey = _type * 10 + nombre;
+        if (_cachedSuggestion.ContainsKey(cacheKey))
+        {
+            return _cachedSuggestion[cacheKey];
+        }
+
         List<Point> Suggestion = new List<Point>();
+        HashSet<Point> SuggestionSet = new HashSet<Point>(); // Pour éviter les doublons en O(1)
         List<List<Point>> LineList = getLineList();
         List<int> indice  = line(nombre, LineList);
         foreach (var index in indice)
         {
-            int count = 0 ; 
+            int count = 0 ;
             if(!VerticalOrHorizontal(LineList[index])){
-                continue; // ignorer le reste et passer a la suite => cause en ne prend que vertical / horizontal pour les lignes en L  
+                continue; // ignorer le reste et passer a la suite => cause en ne prend que vertical / horizontal pour les lignes en L
             }
             List<Point> points = LineList[index];
-         
-            do {  /// pour obtenir la valeur du point dans la même orientation   
-                bool isVertical = isHorizontal(points) ? false : true; 
+
+            do {  /// pour obtenir la valeur du point dans la même orientation
+                bool isVertical = isHorizontal(points) ? false : true;
                 Point externe =  Extremity(LineList[index],LineList[index][count],isVertical);
-                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2  
+                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2
                 {
                     int orientation  = i;
                     Point ajout  = Equation(orientation, externe); // on recupère les points externe suivant l'orientation de la ligne
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout)) Suggestion.Add(ajout); 
-                        orientation = -orientation; // Changer l'orientation
+                    if (!SuggestionSet.Contains(ajout) && !points.Contains(ajout)) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
+                    orientation = -orientation; // Changer l'orientation
                     ajout = Equation(orientation, externe);
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout)) Suggestion.Add(ajout);  
+                    if (!SuggestionSet.Contains(ajout) && !points.Contains(ajout)) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                 }
-                count = count + points.Count -  1;  // passer directement au deriner element apres le premier 
-            }while (count < points.Count);     
+                count = count + points.Count -  1;  // passer directement au deriner element apres le premier
+            }while (count < points.Count);
 
         }
+
+        // Mettre en cache et retourner
+        _cachedSuggestion[cacheKey] = Suggestion;
         return  Suggestion;
     }
 
