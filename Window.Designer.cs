@@ -2,21 +2,24 @@
 
 partial class Window
 {
-    
+
     private System.ComponentModel.IContainer components = null;
     private Panel space;
     private TableLayoutPanel tableLayoutPanel;
     private static Label label1 ;
     private static Label label2 ;
     private List<Point> clickedPoints = new List<Point>();
-   
+
     private int tour = 0;
     private int maxPoint = 0 ;
     private Player player1;
     private Player player2;
     private bool inversed = false;
     private bool hasStarted = false;
-    private bool game = false; 
+    private bool game = false;
+
+    // Optimisation du rendu : drapeau pour savoir si on doit redessiner
+    private bool _isDirty = true; 
     protected override void Dispose(bool disposing)
     {
         if (disposing && (components != null))
@@ -143,19 +146,19 @@ partial class Window
     /// Réinitialise : le compteur de tours (tour), la liste des points cliqués et l'indicateur de couleur.
     /// </summary>
     /// <returns>Un bouton "Restart" réinitialisant l'état du jeu</returns>
-    private Button restart(){ // recomencer le jeu 
+    private Button restart(){ // recomencer le jeu
         Button RestartButton = new Button();
         RestartButton.Text = "Restart";
         RestartButton.Size = new System.Drawing.Size(100, 40); // Set the size of the button
-        RestartButton.Location = new System.Drawing.Point((RestartButton.Width - (start().Width + 150) ) / 2, 10 ); 
-        RestartButton.Anchor = AnchorStyles.Top; 
+        RestartButton.Location = new System.Drawing.Point((RestartButton.Width - (start().Width + 150) ) / 2, 10);
+        RestartButton.Anchor = AnchorStyles.Top;
         RestartButton.MouseClick += (sender, e ) => {
             tour = 0;
             game = true;
             clickedPoints.Clear();
             Line.ClickedPoints.Clear();
             label1.BackColor = Color.Red;
-
+            _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate();
 
         };
@@ -261,13 +264,14 @@ partial class Window
         Button LoadButton = new Button();
         LoadButton.Text = "Load";
         LoadButton.Size = new System.Drawing.Size(100, 40); // Set the size of the button
-        LoadButton.Location = new System.Drawing.Point( ((start().Width + save().Width + 350) - LoadButton.Width) / 2 , 10); 
-        LoadButton.Anchor = AnchorStyles.Top; 
+        LoadButton.Location = new System.Drawing.Point( ((start().Width + save().Width + 350) - LoadButton.Width) / 2 , 10);
+        LoadButton.Anchor = AnchorStyles.Top;
         LoadButton.MouseClick += (sender, e ) => {
             Save sauvegarde = new Save();
             clickedPoints = sauvegarde.getPointList();
-            Line.ClickedPoints = clickedPoints ; 
+            Line.ClickedPoints = clickedPoints ;
             game = true;
+            _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate(); // Déclencher le redessin du panneau
         };
        return LoadButton;
@@ -332,15 +336,17 @@ partial class Window
     /// Crée le panneau principal du terrain de jeu (grille carrée).
     /// Ce panneau gère les événements de dessin et les clics de souris pour placer des points.
     /// Il occupe toute la zone centrale de la fenêtre (DockStyle.Fill).
+    /// OPTIMISÉ : Double buffering activé pour réduire le flickering
     /// </summary>
     /// <returns>Un panneau configuré pour servir de terrain de jeu</returns>
     private Panel espace()
     {
-        space = new Panel
+        space = new DoubleBufferedPanel
         {
             Dock = DockStyle.Fill
         };
         space.Paint += paint;
+        space.Paint += Draw; // Ajouter le handler de détection de victoire une seule fois
         if(game)space.MouseClick += space_MouseClick;
         return space;
     }
@@ -350,12 +356,13 @@ partial class Window
     /// - Le clic est suffisamment proche d'une intersection (tolérance = 25 pixels)
     /// - Le point n'a pas déjà été cliqué
     /// - Le point ne se trouve pas sur une limite de frontière
+    /// - Le point est dans la zone valide de la grille
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
         if (game)
         {
-           
+
             // Tolérance pour détecter les clics proches d'un point d'intersection
             int tolerance = 25;
             int gridSize = 50;
@@ -366,10 +373,13 @@ partial class Window
             if (Math.Abs(e.X - nearestX) <= tolerance && Math.Abs(e.Y - nearestY) <= tolerance)
             {
                 Point p = new Point(nearestX, nearestY);
-              
-                if(!clickedPoints.Contains(p) && !Line.isLimit(p)){
+
+                // Vérifier que le point est dans les limites valides de la grille
+                if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
+                    && !clickedPoints.Contains(p))
+                {
                     add(p);
-                } 
+                }
             }
         }
     } 
@@ -405,7 +415,8 @@ partial class Window
     private void add(Point p){
         tour++;
         clickedPoints.Add(p);
-        space.Paint += Draw; // Ajouter le point d'intersection le plus proche
+        Line.ClickedPoints = clickedPoints; // Mettre à jour immédiatement pour éviter le retard et invalider les caches
+        _isDirty = true; // Marquer qu'on doit redessiner
         space.Invalidate(); // Déclencher le redessin du panneau
     } 
 
@@ -416,24 +427,29 @@ partial class Window
     /// - Affiche chaque point avec sa couleur (rouge ou bleu selon le joueur)
     /// - Met à jour les indicateurs de couleur dans les labels de score
     /// - Vérifie si le nombre maximum de points est atteint (CheckPoint)
+    /// OPTIMISÉ : Double buffering activé pour réduire le flickering
     /// </summary>
     private void paint(object sender, PaintEventArgs e){
-        
+
     // Objet graphics du panneau
         Graphics graph = e.Graphics;
+
+        // Activer l'anti-aliasing pour un rendu plus lisse
+        graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
     // Définition de l'élément pour dessiner la ligne
         Pen BlackPen = new Pen(Color.Black, 2);
     // Définition des lignes verticales
         for(int i = 50; i < space.Width; i += 50){
-            graph.DrawLine(BlackPen, i, 0 , i, space.Height); 
+            graph.DrawLine(BlackPen, i, 0 , i, space.Height);
         }
     // Définition des lignes horizontales
         for(int j = 50; j < space.Height; j += 50){
             graph.DrawLine(BlackPen, 0, j, space.Width, j);
-        } 
+        }
     // Dessiner les points colorés aux emplacements cliqués
         if (maxPoint != 0) CheckPoint();
-        int k = !inversed ?  0 : 1;    
+        int k = !inversed ?  0 : 1;
 
         foreach (var point in clickedPoints)
         {
@@ -448,7 +464,7 @@ partial class Window
                 label1.BackColor = Color.Red;
             }
             k++;
-        }    
+        }
     }
 
     /// <summary>
@@ -456,24 +472,27 @@ partial class Window
     /// Responsabilités :
     /// - Passe la liste des points cliqués à la classe Line
     /// - Vérifie si le joueur 1 a un alignement gagnant (5 points alignés)
-    /// - Vérifie si le joueur 2 a un alignement gagnant 
+    /// - Vérifie si le joueur 2 a un alignement gagnant
     /// - Appelle la fonction de dessin du joueur vainqueur et arrête le jeu
+    /// OPTIMISÉ : Bénéficie du double buffering et mise en cache des calculs
     /// </summary>
     public void Draw(object sender, PaintEventArgs e){
     // Objet graphics du panneau
         Graphics graph = e.Graphics;
+        graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
         Line.ClickedPoints = clickedPoints;
-        
+
         if(player1.has(5) ){
             player1.paint(sender, e);
             game = false;
             return;
-        } 
+        }
         if(player2.has(5)){
             player2.paint(sender, e);
             game = false;
             return;
-        } 
+        }
 
 
     }

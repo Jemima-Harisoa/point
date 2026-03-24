@@ -19,6 +19,20 @@ namespace point
         private int step = 50;
         private int _type;
         private static List<Point> _limit = new List<Point>();
+
+        // Cache pour optimiser getSameColor() - évite de filtrer à chaque appel
+        private static Dictionary<int, List<Point>> _pointsByType = new Dictionary<int, List<Point>>();
+        private static bool _isCacheValid = false;
+
+        // Cache pour optimiser Intersect(), getLineList() et LShapeLine()
+        private static List<Point> _cachedIntersections = null;
+        private static Dictionary<int, List<List<Point>>> _cachedLineList = new Dictionary<int, List<List<Point>>>();
+        private static Dictionary<int, List<List<Point>>> _cachedLShapeLine = new Dictionary<int, List<List<Point>>>();
+
+        // Cache pour optimiser Suggestion() et SuggestionL() - clé: (type * 10 + nombre)
+        private static Dictionary<int, List<Point>> _cachedSuggestion = new Dictionary<int, List<Point>>();
+        private static Dictionary<int, List<Point>> _cachedSuggestionL = new Dictionary<int, List<Point>>();
+
          // Constructeur
         public Line(int type)
         {
@@ -39,6 +53,12 @@ namespace point
                 if (value != null)
                 {
                     _clickedPoints = value;
+                    _isCacheValid = false; // Invalider tous les caches quand les points changent
+                    _cachedIntersections = null;
+                    _cachedLineList.Clear();
+                    _cachedLShapeLine.Clear();
+                    _cachedSuggestion.Clear();
+                    _cachedSuggestionL.Clear();
                 }
             }
         }
@@ -65,34 +85,58 @@ namespace point
         /// - Explore 2 orientations (±1 selon l'axe X/Y)
         /// - Applique l'Equation pour obtenir les points suivants parallèles
         /// - Ajoute tous les points candidats qui ne sont pas déjà utilisés
+        /// OPTIMISÉ : Utilise un cache pour éviter de recalculer les suggestions
         /// </summary>
         /// <param name="nombre">Nombre de points dans la configuration L (3, 4, ou 5)</param>
         /// <returns>Liste de points de suggestion pour des formations en L</returns>
         public List<Point> SuggestionL(int nombre){
+        // Clé de cache unique basée sur type et nombre
+        int cacheKey = _type * 10 + nombre;
+        if (_cachedSuggestionL.ContainsKey(cacheKey))
+        {
+            return _cachedSuggestionL[cacheKey];
+        }
+
         List<Point> Suggestion = new List<Point>();
+        HashSet<Point> SuggestionSet = new HashSet<Point>(); // Pour éviter les doublons en O(1)
+        HashSet<Point> PointsSet = new HashSet<Point>(); // Pour les vérifications rapides
         List<List<Point>> LineList = LShapeLine();
         List<int> indice  = line(nombre, LineList);
         foreach (var index in indice)
         {
             List<Point> points = LineList[index];
+            PointsSet.Clear();
+            foreach (var p in points) PointsSet.Add(p);
+
             Point intersection = Intersection(points);
-            bool isVertical = true; 
-            do {  /// pour obtenir la valeur du point dans une orientation   
+            bool isVertical = true;
+            do {  /// pour obtenir la valeur du point dans une orientation
                 Point externe =  Extremity(LineList[index],intersection,isVertical);
-                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2  
+                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2
                 {
                     int orientation  = i;
                     Point ajout  = Equation(orientation, externe); // on recupère les points externe suivant l'orientation de la ligne
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout) && ajout.X > 0 && ajout.Y > 0  ) Suggestion.Add(ajout); 
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0
+                        && ajout.X < _limit[1].X && ajout.Y < _limit[1].Y) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                     orientation = -orientation; // Changer l'orientation
                     ajout = Equation(orientation, externe);
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout) && ajout.X > 0 && ajout.Y > 0) Suggestion.Add(ajout);  
+                    if (!SuggestionSet.Contains(ajout) && !PointsSet.Contains(ajout) && ajout.X > 0 && ajout.Y > 0
+                        && ajout.X < _limit[1].X && ajout.Y < _limit[1].Y) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                 }
                 isVertical = !isVertical;
-               
-                if(isVertical) break;   // quand l'orientation redevient true on arrête la boucle 
-            }while (true);     
+
+                if(isVertical) break;   // quand l'orientation redevient true on arrête la boucle
+            }while (true);
         }
+
+        // Mettre en cache et retourner
+        _cachedSuggestionL[cacheKey] = Suggestion;
         return  Suggestion;
     }
 
@@ -103,37 +147,55 @@ namespace point
         /// - Cherche les points extrêmes et les points adjacents
         /// - Suggère des points qui poursuivent la ligne dans les deux directions
         /// La logique évite les points déjà occupés.
+        /// OPTIMISÉ : Utilise un cache pour éviter de recalculer les suggestions
         /// </summary>
         /// <param name="nombre">Nombre de points dans la ligne (3, 4, ou 5)</param>
         /// <returns>Liste de points de suggestion pour des lignes droites</returns>
         public List<Point> Suggestion(int nombre){
+        // Clé de cache unique basée sur type et nombre
+        int cacheKey = _type * 10 + nombre;
+        if (_cachedSuggestion.ContainsKey(cacheKey))
+        {
+            return _cachedSuggestion[cacheKey];
+        }
+
         List<Point> Suggestion = new List<Point>();
+        HashSet<Point> SuggestionSet = new HashSet<Point>(); // Pour éviter les doublons en O(1)
         List<List<Point>> LineList = getLineList();
         List<int> indice  = line(nombre, LineList);
         foreach (var index in indice)
         {
-            int count = 0 ; 
+            int count = 0 ;
             if(!VerticalOrHorizontal(LineList[index])){
-                continue; // ignorer le reste et passer a la suite => cause en ne prend que vertical / horizontal pour les lignes en L  
+                continue; // ignorer le reste et passer a la suite => cause en ne prend que vertical / horizontal pour les lignes en L
             }
             List<Point> points = LineList[index];
-         
-            do {  /// pour obtenir la valeur du point dans la même orientation   
-                bool isVertical = isHorizontal(points) ? false : true; 
+
+            do {  /// pour obtenir la valeur du point dans la même orientation
+                bool isVertical = isHorizontal(points) ? false : true;
                 Point externe =  Extremity(LineList[index],LineList[index][count],isVertical);
-                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2  
+                for (int i = 1; i < 3; i++) // on ne considere configuration 1 ou 2
                 {
                     int orientation  = i;
                     Point ajout  = Equation(orientation, externe); // on recupère les points externe suivant l'orientation de la ligne
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout)) Suggestion.Add(ajout); 
-                        orientation = -orientation; // Changer l'orientation
+                    if (!SuggestionSet.Contains(ajout) && !points.Contains(ajout)) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
+                    orientation = -orientation; // Changer l'orientation
                     ajout = Equation(orientation, externe);
-                    if (!Suggestion.Contains(ajout) && !points.Contains(ajout)) Suggestion.Add(ajout);  
+                    if (!SuggestionSet.Contains(ajout) && !points.Contains(ajout)) {
+                        Suggestion.Add(ajout);
+                        SuggestionSet.Add(ajout);
+                    }
                 }
-                count = count + points.Count -  1;  // passer directement au deriner element apres le premier 
-            }while (count < points.Count);     
+                count = count + points.Count -  1;  // passer directement au deriner element apres le premier
+            }while (count < points.Count);
 
         }
+
+        // Mettre en cache et retourner
+        _cachedSuggestion[cacheKey] = Suggestion;
         return  Suggestion;
     }
 
@@ -199,6 +261,14 @@ namespace point
         public List<Point> Liste(int nombre){
         List<List<Point>> Liste = new List<List<Point>>();
 
+        // Chercher d'abord dans les lignes droites (horizontales/verticales)
+        List<List<Point>> lignesDroites = getLineList();
+        foreach (var val in lignesDroites)
+        {
+            if(val.Count == nombre) return val;
+        }
+
+        // Si pas de ligne droite, chercher dans les lignes en L
         foreach (var item in Intersect())
         {
             List<List<Point>> list =  Intersection(item);
@@ -209,35 +279,36 @@ namespace point
             }
 
         }
-        return new List<Point>();   
+        return new List<Point>();
     }
 
-        /// <summary>
-        /// Filtre une liste de listes de points et retourne les indices des listes ayant exactement 'nombre' éléments.
-        /// Utile pour identifier rapidement les formations d'une taille spécifique.
-        /// </summary>
-        /// <param name="nombre">Le nombre de points recherchés dans chaque sous-liste</param>
-        /// <param name="linelist">Liste de listes de points à filtrer</param>
-        /// <returns>Liste des indices (dans linelist) des listes ayant exactement 'nombre' éléments</returns>
-        public List<int> line(int nombre, List<List<Point>> linelist){/// voir les tables qui contiennent nombre élément dans un tableau de liste de point pour adapter avec les line en l ou non
-            List<int> line = new List<int>();
-            int i = 0;
-            foreach (var item in  linelist)
-            {
-                if(item.Count == nombre){
-                    line.Add(i);
-                }
-                i++; 
+    /// <summary>
+    /// Filtre une liste de listes de points et retourne les indices des listes ayant exactement 'nombre' éléments.
+    /// Utile pour identifier rapidement les formations d'une taille spécifique.
+    /// </summary>
+    /// <param name="nombre">Le nombre de points recherchés dans chaque sous-liste</param>
+    /// <param name="linelist">Liste de listes de points à filtrer</param>
+    /// <returns>Liste des indices (dans linelist) des listes ayant exactement 'nombre' éléments</returns>
+    public List<int> line(int nombre, List<List<Point>> linelist){/// voir les tables qui contiennent nombre élément dans un tableau de liste de point pour adapter avec les line en l ou non
+        List<int> line = new List<int>();
+        int i = 0;
+        foreach (var item in  linelist)
+        {
+            if(item.Count == nombre){
+                line.Add(i);
             }
-            return line;
+            i++; 
         }
-        /// <summary>
-        /// Trouve toutes les lignes en L-shape (formations perpendiculaires) qui passent par un point d'intersection spécifique.
-        /// Une ligne en L-shape est une combinaison de deux directions perpendiculaires se croisant à un angle droit.
-        /// </summary>
-        /// <param name="points">Le point d'intersection à analyser</param>
-        /// <returns>Liste de toutes les lignes en L-shape passant par ce point</returns>
-        public List<List<Point>> Intersection(Point points){
+        return line;
+    }
+
+    /// <summary>
+    /// Trouve toutes les lignes en L-shape (formations perpendiculaires) qui passent par un point d'intersection spécifique.
+    /// Une ligne en L-shape est une combinaison de deux directions perpendiculaires se croisant à un angle droit.
+    /// </summary>
+    /// <param name="points">Le point d'intersection à analyser</param>
+    /// <returns>Liste de toutes les lignes en L-shape passant par ce point</returns>
+    public List<List<Point>> Intersection(Point points){
         List<List<Point>> Interction = new List<List<Point>>();
 
         foreach (var item in LShapeLine())
@@ -275,33 +346,49 @@ namespace point
         return Extremity;
     }
 
-        /// <summary>
-        /// Génère toutes les lignes en L-shape (formations perpendiculaires) actuelles sur le plateau.
-        /// Processus :
-        /// 1. Identifie tous les points d'intersection du plateau
-        /// 2. Pour chaque intersection, trouve les lignes verticales/horizontales qui y passent
-        /// 3. Combine ces lignes perpendiculaires pour créer des formations L-shape
-        /// </summary>
-        /// <returns>Liste de toutes les configurations L-shape possibles</returns>
-        public List<List<Point>> LShapeLine(){ //liste des lignes en L  
+    /// <summary>
+    /// Génère toutes les lignes en L-shape (formations perpendiculaires) actuelles sur le plateau.
+    /// Processus :
+    /// 1. Identifie tous les points d'intersection du plateau
+    /// 2. Pour chaque intersection, trouve les lignes verticales/horizontales qui y passent
+    /// 3. Combine ces lignes perpendiculaires pour créer des formations L-shape
+    /// OPTIMISÉ : Utilise un cache et HashSet pour éviter les recalculs et comparaisons coûteuses
+    /// </summary>
+    /// <returns>Liste de toutes les configurations L-shape possibles</returns>
+    public List<List<Point>> LShapeLine(){ //liste des lignes en L
+        // Utiliser le cache si disponible pour ce type de joueur
+        if (_cachedLShapeLine.ContainsKey(_type))
+        {
+            return _cachedLShapeLine[_type];
+        }
+
         List<List<Point>> LineL = new List<List<Point>>();
+        HashSet<List<Point>> LineLSet = new HashSet<List<Point>>();
         List<List<Point>> Line = new List<List<Point>>();
+        HashSet<List<Point>> LineSet = new HashSet<List<Point>>();
         List<Point> Interction = Intersect();
+
         foreach (var intersect in Interction) // voir chaque point d'intersection
         {
-            
             foreach (var item in LineListByIntersection(intersect)) // recherche les lignes qui se croise en ces points
             {
-                if(VerticalOrHorizontal(item) && !Line.Contains(item)) Line.Add(item); // si les lignes sont vertical ou horizontal on les prends
-            }
-            
-            foreach (var LineWithIntersection in Construct(intersect, Line)) // on construit les intersections sur les angles droit 
-            {
-                if(!VerticalOrHorizontal(LineWithIntersection) && !LineL.Contains(LineWithIntersection)){
-                    LineL.Add(LineWithIntersection);
+                if(VerticalOrHorizontal(item) && !LineSet.Contains(item)) {
+                    Line.Add(item);
+                    LineSet.Add(item); // Utiliser HashSet pour O(1) lookup
                 }
             }
-        }   
+
+            foreach (var LineWithIntersection in Construct(intersect, Line)) // on construit les intersections sur les angles droit
+            {
+                if(!VerticalOrHorizontal(LineWithIntersection) && !LineLSet.Contains(LineWithIntersection)){
+                    LineL.Add(LineWithIntersection);
+                    LineLSet.Add(LineWithIntersection);
+                }
+            }
+        }
+
+        // Mettre en cache et retourner
+        _cachedLShapeLine[_type] = LineL;
         return LineL;
     }
         /// <summary>
@@ -312,6 +399,42 @@ namespace point
         public static bool VerticalOrHorizontal(List<Point> points){
             if(isHorizontal(points) || isVertical(points)) return true;
             return false;
+        }
+
+        /// <summary>
+        /// Vérifie si une liste de points forme une ligne diagonale.
+        /// Une ligne diagonale a un ratio X/Y constant (diagonale croissante ou décroissante).
+        /// </summary>
+        /// <param name="points">Liste de points à vérifier</param>
+        /// <returns>true si les points forment une diagonale</returns>
+        public static bool isDiagonal(List<Point> points){
+            if(points.Count < 2) return false;
+
+            // Calculer le ratio entre deltaX et deltaY pour les deux premiers points
+            Point p1 = points[0];
+            Point p2 = points[1];
+            int deltaX = p2.X - p1.X;
+            int deltaY = p2.Y - p1.Y;
+
+            // Une diagonale a |deltaX| == |deltaY|
+            if(Math.Abs(deltaX) != Math.Abs(deltaY)) return false;
+
+            // Vérifier que tous les autres points suivent le même ratio
+            for (int i = 1; i < points.Count - 1; i++)
+            {
+                Point current = points[i];
+                Point next = points[i + 1];
+                int dx = next.X - current.X;
+                int dy = next.Y - current.Y;
+
+                // Tous les segments doivent avoir le même ratio
+                if(Math.Abs(dx) != Math.Abs(dy)) return false;
+                // La direction doit être cohérente
+                if(deltaX != 0 && dx != 0 && (deltaX * dx < 0)) return false;
+                if(deltaY != 0 && dy != 0 && (deltaY * dy < 0)) return false;
+            }
+
+            return true;
         }
         /// <summary>
         /// Vérifie si une liste de points forme une ligne horizontale purem (tous même Y).
@@ -429,28 +552,40 @@ namespace point
         /// <summary>
         /// Identifie tous les points d'intersection sur le plateau de jeu.
         /// Un point d'intersection est un point où deux ou plusieurs lignes (parallélogrammes différentes) se croisent.
-        /// Algorithme :
-        /// - Compare chaque paire de lignes droites
-        /// - Cherche les points qui apparaissent dans les deux lignes
+        /// OPTIMISÉ : Utilise un cache et HashSet pour des comparaisons O(1) au lieu de O(n)
         /// </summary>
         /// <returns>Liste de tous les points d'intersection du plateau</returns>
         public List<Point> Intersect (){
-            List<Point> Intersect = new List<Point>();
-            List<Point> Visited = new List<Point>();
-            List<List<Point>> LineList = getLineList();   
+            // Utiliser le cache si disponible
+            if (_cachedIntersections != null)
+            {
+                return _cachedIntersections;
+            }
+
+            HashSet<Point> intersectSet = new HashSet<Point>();
+            List<List<Point>> LineList = getLineList();
+
             for (int i = 0; i < LineList.Count; i++)
             {
-                List<Point> line = LineList[i];
+                // Convertir la ligne actuelle en HashSet pour des recherches O(1)
+                HashSet<Point> lineSet = new HashSet<Point>(LineList[i]);
+
                 for (int j = i + 1;  j < LineList.Count; j++)
                 {
-                   foreach (var item in line)
-                   {
-                        if(LineList[j].Contains(item) && !Intersect.Contains(item)) Intersect.Add(item); 
-                        if(!Visited.Contains(item)) Visited.Add(item); 
-                   } 
-                }    
+                    // Trouver l'intersection entre les deux ensembles
+                    foreach (var point in LineList[j])
+                    {
+                        if (lineSet.Contains(point))
+                        {
+                            intersectSet.Add(point);
+                        }
+                    }
+                }
             }
-            return Intersect;
+
+            // Mettre en cache et retourner
+            _cachedIntersections = intersectSet.ToList();
+            return _cachedIntersections;
         }
         /// <summary>
         /// Vérifie si un point se trouve sur une limite du terrain de jeu.
@@ -492,10 +627,17 @@ namespace point
         /// 3. Construit des listes de points alignés dans chaque direction
         /// 4. Remonte les listes en ordre (extrémités d'abord)
         /// Cette fonction est centrale pour détecter les formations gagnantes.
+        /// OPTIMISÉ : Utilise un cache pour éviter de recalculer à chaque appel
         /// </summary>
         /// <returns>Liste de toutes les configurations de lignes possibles pour ce joueur</returns>
         public List<List<Point>> getLineList()
         {
+            // Utiliser le cache si disponible pour ce type de joueur
+            if (_cachedLineList.ContainsKey(_type))
+            {
+                return _cachedLineList[_type];
+            }
+
             List<List<Point>> getLineList = new List<List<Point>>();
             List<Point> PointsList = new List<Point>();
             List<Point> Points = getSameColor();
@@ -518,7 +660,7 @@ namespace point
                     int count = 0;
                     int currentDirection = i; // Garder la direction actuelle pour le traitement
                     int index;
-                  
+
 
                     do
                     {
@@ -540,12 +682,14 @@ namespace point
                     // Ordonner les points afin que les extrémités soient en premier et dernier
 
                     if(PointsList.Count >  1) {
-                        PointsList = PointsList.OrderBy(p => p.X).ThenBy(p => p.Y).ToList(); 
+                        PointsList = PointsList.OrderBy(p => p.X).ThenBy(p => p.Y).ToList();
                         getLineList.Add(new List<Point>(PointsList));
                     }
                 }
             }
-            
+
+            // Mettre en cache et retourner
+            _cachedLineList[_type] = getLineList;
             return getLineList;
         }
 
@@ -606,21 +750,29 @@ namespace point
         /// Les points appartenant au joueur possèdent un ordre pair ou impair selon le type du joueur.
         /// Exemple : Type 0 = tous les points à index pair (0, 2, 4, ...)
         ///          Type 1 = tous les points à index impair (1, 3, 5, ...)
+        /// OPTIMISÉ : Utilise un cache pour éviter de refiltrer à chaque appel (gain de performance majeur)
         /// </summary>
         /// <returns>Liste des points appartenant uniquement à ce joueur</returns>
         private List<Point> getSameColor()
         {
-            List<Point> getSameColor = new List<Point>();
-            int rest = _type, i = 0;
-            foreach (Point item in ClickedPoints)
+            // Si le cache est invalide, reconstruire pour tous les types en un seul passage
+            if (!_isCacheValid)
             {
-                if (rest == i % 2)
+                _pointsByType.Clear();
+                _pointsByType[0] = new List<Point>();
+                _pointsByType[1] = new List<Point>();
+
+                for (int i = 0; i < ClickedPoints.Count; i++)
                 {
-                    getSameColor.Add(item);
+                    int type = i % 2;
+                    _pointsByType[type].Add(ClickedPoints[i]);
                 }
-                i++;
+
+                _isCacheValid = true;
             }
-            return getSameColor;
+
+            // Retourner la liste du type demandé depuis le cache
+            return _pointsByType.ContainsKey(_type) ? _pointsByType[_type] : new List<Point>();
         }
 
         /// <summary>
