@@ -37,9 +37,12 @@ public class Player
     /// Dessine les lignes gagnantes du joueur sur le terrain.
     /// Récupère la configuration gagnante (5 points alignés) et dessine deux lignes perpendiculaires
     /// passant par le point d'intersection, créant une croix gagnante avec la couleur du joueur.
+    /// OPTIMISÉ : Bénéficie du cache de Line.Liste() et double buffering
     /// </summary>
     public void paint(object sender, PaintEventArgs paint){
         Graphics graph = paint.Graphics;
+        graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
         List<Point> ligne = line.Liste(5);
         Pen Pen = new Pen(color,5);
         //  Console.WriteLine($"configuration gagnante :");
