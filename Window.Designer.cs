@@ -346,6 +346,7 @@ partial class Window
             Dock = DockStyle.Fill
         };
         space.Paint += paint;
+        space.Paint += Draw; // Ajouter le handler de détection de victoire une seule fois
         if(game)space.MouseClick += space_MouseClick;
         return space;
     }
