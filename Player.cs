@@ -35,8 +35,9 @@ public class Player
     }
     /// <summary>
     /// Dessine les lignes gagnantes du joueur sur le terrain.
-    /// Récupère la configuration gagnante (5 points alignés) et dessine deux lignes perpendiculaires
-    /// passant par le point d'intersection, créant une croix gagnante avec la couleur du joueur.
+    /// Récupère la configuration gagnante (5 points alignés) et dessine :
+    /// - Pour une ligne droite (vertical/horizontal) : une seule ligne du premier au dernier point
+    /// - Pour une forme en L : deux lignes perpendiculaires passant par le point d'intersection
     /// OPTIMISÉ : Bénéficie du cache de Line.Liste() et double buffering
     /// </summary>
     public void paint(object sender, PaintEventArgs paint){
@@ -44,20 +45,27 @@ public class Player
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
         List<Point> ligne = line.Liste(5);
+        if(ligne.Count == 0) return; // Aucune ligne gagnante trouvée
+
         Pen Pen = new Pen(color,5);
-        //  Console.WriteLine($"configuration gagnante :");
-        // foreach (var item in ligne)
-        // {
-        //     Console.Write($"({item.X}, {item.Y}) ");
-        // }
-        // Console.WriteLine();
-        // Console.WriteLine();
-        Point intersection = line.Intersection(ligne);
-        Point ExtremityVertical = line.Extremity( ligne, intersection, true);
-        Point ExtremityHorizontal = line.Extremity( ligne, intersection, false);
-        graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityVertical.X, ExtremityVertical.Y);
-        graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityHorizontal.X, ExtremityHorizontal.Y);
-        //graph.DrawLine(Pen, ExtremityVertical.X, ExtremityVertical.Y, ExtremityHorizontal.X, ExtremityHorizontal.Y);
+
+        // Vérifier si c'est une ligne droite (verticale ou horizontale)
+        if(Line.VerticalOrHorizontal(ligne))
+        {
+            // Pour une ligne droite : dessiner du premier au dernier point
+            Point premier = ligne[0];
+            Point dernier = ligne[ligne.Count - 1];
+            graph.DrawLine(Pen, premier.X, premier.Y, dernier.X, dernier.Y);
+        }
+        else
+        {
+            // Pour une forme en L : dessiner les deux lignes perpendiculaires
+            Point intersection = line.Intersection(ligne);
+            Point ExtremityVertical = line.Extremity( ligne, intersection, true);
+            Point ExtremityHorizontal = line.Extremity( ligne, intersection, false);
+            graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityVertical.X, ExtremityVertical.Y);
+            graph.DrawLine(Pen, intersection.X, intersection.Y, ExtremityHorizontal.X, ExtremityHorizontal.Y);
+        }
     }
     /// <summary>
     /// Suggère le meilleur point à jouer pour un joueur selon une stratégie intelligente.
