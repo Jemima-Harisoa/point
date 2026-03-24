@@ -29,16 +29,28 @@ public static class GameConfig
     // Configuration de la grille
 
     /// <summary>
-    /// Espacement entre les points de la grille (en pixels).
-    /// Par défaut: 50 pixels
+    /// Nombre de colonnes dans la grille.
+    /// Par défaut: 15 colonnes
     /// </summary>
-    public static int GridSize = 50;
+    public static int GridColumns = 15;
+
+    /// <summary>
+    /// Nombre de lignes dans la grille.
+    /// Par défaut: 10 lignes
+    /// </summary>
+    public static int GridRows = 10;
+
+    /// <summary>
+    /// Espacement entre les points de la grille (en pixels).
+    /// Calculé automatiquement selon la taille du panneau et le nombre de colonnes/lignes.
+    /// </summary>
+    public static int GridSize { get; private set; } = 50;
 
     /// <summary>
     /// Tolérance pour détecter les clics proches d'un point d'intersection (en pixels).
-    /// Par défaut: 25 pixels
+    /// Par défaut: 25 pixels (50% de GridSize)
     /// </summary>
-    public static int ClickTolerance = 25;
+    public static int ClickTolerance { get; private set; } = 25;
 
     // Méthodes utilitaires
 
@@ -50,8 +62,9 @@ public static class GameConfig
         PointsToWin = 5;
         PointsForCanWin = 4;
         PointsForThree = 3;
-        GridSize = 50;
-        ClickTolerance = 25;
+        GridColumns = 15;
+        GridRows = 10;
+        UpdateGridSize();
     }
 
     /// <summary>
@@ -66,16 +79,53 @@ public static class GameConfig
                 PointsToWin = 4;
                 PointsForCanWin = 3;
                 PointsForThree = 2;
+                GridColumns = 10;
+                GridRows = 8;
                 break;
             case "hard":
                 PointsToWin = 6;
                 PointsForCanWin = 5;
                 PointsForThree = 4;
+                GridColumns = 20;
+                GridRows = 15;
                 break;
             case "normal":
             default:
                 ResetToDefaults();
                 break;
         }
+        UpdateGridSize();
+    }
+
+    /// <summary>
+    /// Met à jour la taille de la grille en pixels selon les dimensions du panneau.
+    /// La taille est calculée pour s'adapter parfaitement au nombre de colonnes/lignes.
+    /// </summary>
+    /// <param name="panelWidth">Largeur du panneau en pixels</param>
+    /// <param name="panelHeight">Hauteur du panneau en pixels</param>
+    public static void UpdateGridSize(int panelWidth = 700, int panelHeight = 450)
+    {
+        // Calculer la taille de grille pour que les colonnes/lignes s'adaptent parfaitement
+        int gridSizeX = panelWidth / GridColumns;
+        int gridSizeY = panelHeight / GridRows;
+
+        // Utiliser la taille la plus petite pour garder une grille carrée
+        GridSize = Math.Min(gridSizeX, gridSizeY);
+
+        // La tolérance de clic est 50% de la taille de la grille
+        ClickTolerance = GridSize / 2;
+    }
+
+    /// <summary>
+    /// Configure la grille avec un nombre spécifique de colonnes et lignes.
+    /// </summary>
+    /// <param name="columns">Nombre de colonnes</param>
+    /// <param name="rows">Nombre de lignes</param>
+    public static void SetGridDimensions(int columns, int rows)
+    {
+        GridColumns = Math.Max(5, columns);  // Minimum 5 colonnes
+        GridRows = Math.Max(5, rows);        // Minimum 5 lignes
+        UpdateGridSize();
     }
 }
+

@@ -166,40 +166,92 @@ partial class Window
     }
 
     /// <summary>
-    /// Affiche un formulaire de démarrage permettant aux joueurs d'entrer leurs noms et le nombre maximum de points.
+    /// Affiche un formulaire de démarrage permettant aux joueurs d'entrer leurs noms et configurer les paramètres du jeu.
     /// Initialise les joueurs et valide les paramètres du jeu avant le lancement.
+    /// Paramètres configurables:
+    /// - Noms des deux joueurs
+    /// - Nombre maximum de points par manche
+    /// - Nombre de colonnes de la grille
+    /// - Nombre de lignes de la grille
+    /// - Nombre de points à aligner pour gagner
     /// </summary>
     private void ShowStartForm()
     {
         Form startForm = new Form();
-        startForm.Text = "Entrer les noms des joueurs";
-        startForm.Size = new Size(450, 250);
+        startForm.Text = "Configuration du jeu";
+        startForm.Size = new Size(500, 450);
+        startForm.StartPosition = FormStartPosition.CenterScreen;
 
-        Label labelPlayer1 = new Label() { Text = "Joueur 1:", Location = new Point(10, 20) };
-        TextBox textBoxPlayer1 = new TextBox() {Text = "player1", Location = new Point(250, 10), Width = 150, Height = 50 };
+        // Joueur 1
+        Label labelPlayer1 = new Label() { Text = "Joueur 1:", Location = new Point(10, 20), Width = 150 };
+        TextBox textBoxPlayer1 = new TextBox() { Text = "player1", Location = new Point(250, 10), Width = 200, Height = 30 };
 
-        Label labelPlayer2 = new Label() { Text = "Joueur 2:", Location = new Point(10, 60) };
-        TextBox textBoxPlayer2 = new TextBox() { Text = "player2", Location = new Point(250, 50), Width = 150, Height = 50 };
+        // Joueur 2
+        Label labelPlayer2 = new Label() { Text = "Joueur 2:", Location = new Point(10, 60), Width = 150 };
+        TextBox textBoxPlayer2 = new TextBox() { Text = "player2", Location = new Point(250, 50), Width = 200, Height = 30 };
 
-        Label Point = new Label() { Text = "Maximum de point:", Location = new Point(10, 100) }; /// maximum de point par joueur
-        TextBox textMaxPoint = new TextBox() { Location = new Point(250, 100), Width = 150, Height = 50, Text = "0" };
+        // Points maximum par manche
+        Label labelMaxPoint = new Label() { Text = "Points max par manche (0 = illimité):", Location = new Point(10, 100), Width = 200 };
+        TextBox textMaxPoint = new TextBox() { Location = new Point(250, 100), Width = 200, Height = 30, Text = "0" };
 
-        Button buttonOk = new Button() { Text = "OK", Location = new Point(300, 140), Width = 80, Height = 50 };
-        buttonOk.Click += (sender, e) => 
-        {   
-            hasStarted = true;
-            game = true;
-            maxPoint = int.Parse(textMaxPoint.Text) ;
-            InitializePlayer(textBoxPlayer1.Text, textBoxPlayer2.Text);
-            startForm.Close();
+        // Colonnes de la grille
+        Label labelColumns = new Label() { Text = "Colonnes grille:", Location = new Point(10, 140), Width = 200 };
+        TextBox textColumns = new TextBox() { Location = new Point(250, 140), Width = 200, Height = 30, Text = GameConfig.GridColumns.ToString() };
+
+        // Lignes de la grille
+        Label labelRows = new Label() { Text = "Lignes grille:", Location = new Point(10, 180), Width = 200 };
+        TextBox textRows = new TextBox() { Location = new Point(250, 180), Width = 200, Height = 30, Text = GameConfig.GridRows.ToString() };
+
+        // Points pour gagner
+        Label labelPointsToWin = new Label() { Text = "Points à aligner pour gagner:", Location = new Point(10, 220), Width = 200 };
+        TextBox textPointsToWin = new TextBox() { Location = new Point(250, 220), Width = 200, Height = 30, Text = GameConfig.PointsToWin.ToString() };
+
+        // Bouton OK
+        Button buttonOk = new Button() { Text = "Commencer", Location = new Point(250, 270), Width = 200, Height = 40 };
+        buttonOk.Click += (sender, e) =>
+        {
+            try
+            {
+                // Valider les entrées
+                hasStarted = true;
+                game = true;
+                maxPoint = int.Parse(textMaxPoint.Text);
+                InitializePlayer(textBoxPlayer1.Text, textBoxPlayer2.Text);
+
+                // Paramètres de la grille
+                int columns = int.Parse(textColumns.Text);
+                int rows = int.Parse(textRows.Text);
+                GameConfig.SetGridDimensions(columns, rows);
+
+                // Points pour gagner
+                GameConfig.PointsToWin = int.Parse(textPointsToWin.Text);
+                GameConfig.PointsForCanWin = Math.Max(1, GameConfig.PointsToWin - 1);
+
+                startForm.Close();
+            }
+            catch (FormatException)
+            {
+                MessageBox.Show("Veuillez entrer des nombres valides pour tous les champs numériques.", "Erreur de saisie");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Erreur: {ex.Message}", "Erreur");
+            }
         };
 
+        // Ajouter les contrôles au formulaire
         startForm.Controls.Add(labelPlayer1);
         startForm.Controls.Add(textBoxPlayer1);
         startForm.Controls.Add(labelPlayer2);
         startForm.Controls.Add(textBoxPlayer2);
-        startForm.Controls.Add(Point);
+        startForm.Controls.Add(labelMaxPoint);
         startForm.Controls.Add(textMaxPoint);
+        startForm.Controls.Add(labelColumns);
+        startForm.Controls.Add(textColumns);
+        startForm.Controls.Add(labelRows);
+        startForm.Controls.Add(textRows);
+        startForm.Controls.Add(labelPointsToWin);
+        startForm.Controls.Add(textPointsToWin);
         startForm.Controls.Add(buttonOk);
 
         startForm.ShowDialog();

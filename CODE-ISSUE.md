@@ -53,7 +53,7 @@ Pour 500 points: ~250 000 opérations
 
 # Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L
 - [x] Simplifier la logique du jeu victoire si n point aligne en ligne droite
-- [] Commenter les boutons de suggestion
+- [x] Commenter les boutons de suggestion
 - [x] Parametrer le nombre de ligne et colonne ainsi que le nombre de ligne a aligner pour dire que le joueur a gagner (defaut 5) avec le modal de depart 
 
 
