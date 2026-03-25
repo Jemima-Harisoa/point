@@ -435,12 +435,20 @@ partial class Window
         Button SaveButton = new Button();
         SaveButton.Text = "Save";
         SaveButton.Size = new System.Drawing.Size(100, 40); // Set the size of the button
-        SaveButton.Location = new System.Drawing.Point( ((start().Width + 250 ) - SaveButton.Width) / 2 , 10); 
-        SaveButton.Anchor = AnchorStyles.Top; 
+        SaveButton.Location = new System.Drawing.Point( ((start().Width + 250 ) - SaveButton.Width) / 2 , 10);
+        SaveButton.Anchor = AnchorStyles.Top;
         SaveButton.MouseClick += (sender, e ) => {
+            // DEBUG: Log des missiles avant sauvegarde
+            MissileDebug.LogMissilesBeforeSave(player1, player2);
+
             Save sauvegarde = new Save(clickedPoints);
+            // Ajouter les missiles à la sauvegarde
+            sauvegarde.AddMissilesFromPlayers(player1, player2);
             sauvegarde.Write(player1.nom, player2.nom);
             game = true;
+
+            MessageBox.Show($"Partie sauvegardée !\nPoints: {clickedPoints.Count}\nMissiles J1: {player1.Missiles.Count}\nMissiles J2: {player2.Missiles.Count}",
+                           "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
        return SaveButton;
     }
@@ -466,10 +474,49 @@ partial class Window
                 pointOwners.Add(i % 2);
                 actionHistory.Add(0);
             }
+
+            // Charger et restaurer les missiles
+            var savedMissiles = sauvegarde.getMissileList();
+            player1.Missiles.Clear();
+            player2.Missiles.Clear();
+
+            int missiles1Count = 0;
+            int missiles2Count = 0;
+
+            foreach (var savedMissile in savedMissiles)
+            {
+                // Déterminer le propriétaire du missile
+                Player owner = savedMissile.OwnerOrder == player1.Order ? player1 : player2;
+
+                // Créer et restaurer le missile
+                Missile missile = new Missile(owner.color);
+                missile.RestoreFromSave(
+                    new Point(savedMissile.LaunchX, savedMissile.LaunchY),
+                    new Point(savedMissile.ImpactX, savedMissile.ImpactY),
+                    savedMissile.Power,
+                    savedMissile.Direction,
+                    savedMissile.HitTarget
+                );
+
+                // Ajouter le missile à la liste du bon joueur
+                owner.Missiles.Add(missile);
+
+                if (owner == player1)
+                    missiles1Count++;
+                else
+                    missiles2Count++;
+            }
+
+            // DEBUG: Log des missiles après chargement
+            MissileDebug.LogMissilesAfterLoad(player1, player2, savedMissiles);
+
             SyncLineClickedPoints();
             game = true;
             _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate(); // Déclencher le redessin du panneau
+
+            MessageBox.Show($"Partie chargée !\nPoints: {clickedPoints.Count}\nMissiles chargés: {savedMissiles.Count}\n  - J1: {missiles1Count}\n  - J2: {missiles2Count}",
+                           "Chargement", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
        return LoadButton;
     }

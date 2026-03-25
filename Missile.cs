@@ -92,6 +92,23 @@ namespace point
         }
 
         /// <summary>
+        /// Restaure un missile depuis une sauvegarde
+        /// Utilisé pour charger les missiles après un Load
+        /// </summary>
+        public void RestoreFromSave(Point launchPos, Point impactPos, int power, int direction, bool hitTarget)
+        {
+            Position = launchPos;
+            Power = power;
+            Direction = direction;
+            State = MissileState.Destroyed;
+            HitTarget = hitTarget;
+
+            // Créer une trajectoire minimale avec juste le point d'impact
+            Trajectory = new List<Point> { impactPos };
+            CurrentStep = 0;
+        }
+
+        /// <summary>
         /// Vérifie si le missile entre en collision avec un point ennemi
         /// </summary>
         public bool CheckCollision(List<Point> enemyPoints)
