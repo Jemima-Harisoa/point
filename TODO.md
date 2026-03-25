@@ -18,15 +18,15 @@
 - [X] Commenter les logiques de jeu sur les suggestion de point et le condition de victoire dans le cas ou un jour alignerait 5 points en L (On ne supprime rien on empeche les regle qui ) 
 
 
-### [] Classe missile : 
+### [X] Classe missile :
 - Créer une classe `Missile` pour gérer les propriétés et les comportements des missiles.
-    - [] Propriétés : position, puissance de lancement, état (en vol, détruit, etc.).
-    - [] Méthodes : déplacement du missile, détection de collision avec les points ennemis, destruction du point ennemi.
-    - [] Affichage : gérer l'affichage du missile sur la grille. (the class draw itself cf la classe point, ligne etc)
+    - [X] Propriétés : position, puissance de lancement, état (en vol, détruit, etc.).
+    - [X] Méthodes : déplacement du missile, détection de collision avec les points ennemis, destruction du point ennemi.
+    - [X] Affichage : gérer l'affichage du missile sur la grille. (the class draw itself cf la classe point, ligne etc)
 - Integerer la logique de lancement de missile dans le tour de jeu, en s'assurant que les joueurs ne peuvent lancer qu'un missile par tour ou placer un point :
-    - [] Faire aparaitre la barre de lancement de missile pour chaque joueur, et permettre aux joueurs de choisir la ligne de lancement et la puissance du missile.
-    - [] Gérer les interactions entre les missiles et les points ennemis, en mettant à jour l'état du jeu en conséquence (ex : destruction du point ennemi, mise à jour de la grille, etc.).
-- [] Ajouter un input pour parametrer le nombre de colone de et ligne de la grille avec le showdialog de la classe window.designer.cs
+    - [X] Faire aparaitre la barre de lancement de missile pour chaque joueur, et permettre aux joueurs de choisir la ligne de lancement et la puissance du missile.
+    - [X] Gérer les interactions entre les missiles et les points ennemis, en mettant à jour l'état du jeu en conséquence (ex : destruction du point ennemi, mise à jour de la grille, etc.).
+- [X] Ajouter un input pour parametrer le nombre de colone de et ligne de la grille avec le showdialog de la classe window.designer.cs
 
 ### [] Persistance de données : PostgresQl
 - [] Modeliser le schema de donnees pour le jeu de point, en identifiant les entités principales (joueurs, parties, scores, etc.) et leurs relations.

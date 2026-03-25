@@ -785,6 +785,14 @@ namespace point
         }
 
         /// <summary>
+        /// Retourne les points du joueur pour l'utilisation externe (ex: détection de collision de missile)
+        /// </summary>
+        public List<Point> GetPlayerPoints()
+        {
+            return getSameColor();
+        }
+
+        /// <summary>
         /// Calcule déplacements géométriques basiques pour former les lignes.
         /// Les 4 directions possibles sont :
         /// - Num 1 : Vertical (vers le haut/bas) : Y +/- step

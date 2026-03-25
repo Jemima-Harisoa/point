@@ -105,9 +105,14 @@ public static class GameConfig
     /// <param name="panelHeight">Hauteur du panneau en pixels</param>
     public static void UpdateGridSize(int panelWidth = 700, int panelHeight = 450)
     {
-        // Calculer la taille de grille pour que les colonnes/lignes s'adaptent parfaitement
-        int gridSizeX = panelWidth / GridColumns;
-        int gridSizeY = panelHeight / GridRows;
+        // Ajouter une "cellule" de marge autour de la grille :
+        // si N lignes/colonnes, on calcule la taille sur N+1 intervalles.
+        int safeColumns = Math.Max(1, GridColumns + 1);
+        int safeRows = Math.Max(1, GridRows + 1);
+
+        // Calculer la taille de grille pour que les colonnes/lignes s'adaptent avec marge
+        int gridSizeX = Math.Max(1, panelWidth / safeColumns);
+        int gridSizeY = Math.Max(1, panelHeight / safeRows);
 
         // Utiliser la taille la plus petite pour garder une grille carrée
         GridSize = Math.Min(gridSizeX, gridSizeY);

@@ -1,24 +1,80 @@
-name: Auto-add commits to PR
+name: Mise a jour description PR
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: write
 
 jobs:
-  add-commits:
+  update-pr-description:
+    name: MAJ auto de la description
     runs-on: ubuntu-latest
-    permissions:
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
-      - name: Get commits and update PR
-        run: |
-          COMMITS=$(git log origin/main..HEAD --oneline)
-          BODY=$(gh pr view ${{ github.event.pull_request.number }} -t '{{ .body }}')
-          NEW_BODY="$BODY
-          gh pr edit ${{ github.event.pull_request.number }} --body "$NEW_BODY"
-        env:
-          GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update PR body with commits
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = '.github/PULL_REQUEST_TEMPLATE.md';
+            const startMarker = '<!-- AUTO-COMMITS-START -->';
+            const endMarker = '<!-- AUTO-COMMITS-END -->';
+
+            const pr = context.payload.pull_request;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pull_number = pr.number;
+
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
+
+            const commitLines = commits.length
+              ? commits
+                  .slice(-20)
+                  .map((c) => `- ${c.sha.substring(0, 7)} ${c.commit.message.split('\n')[0]}`)
+                  .join('\n')
+              : '- Aucun commit detecte';
+
+            const autoSection = [
+              startMarker,
+              '## Commits de cette PR',
+              '',
+              commitLines,
+              '',
+              endMarker,
+            ].join('\n');
+
+            let body = (pr.body || '').trim();
+
+            // Si la PR est vide, pre-remplir avec le template si disponible
+            if (!body) {
+              if (fs.existsSync(path)) {
+                body = fs.readFileSync(path, 'utf8').trim();
+              } else {
+                body = '## Description\n\n';
+              }
+            }
+
+            const markerRegex = new RegExp(`${startMarker}[\\s\\S]*?${endMarker}`, 'm');
+            if (markerRegex.test(body)) {
+              body = body.replace(markerRegex, autoSection);
+            } else {
+              body = `${body}\n\n${autoSection}`;
+            }
+
+            await github.rest.pulls.update({
+              owner,
+              repo,
+              pull_number,
+              body,
+            });
