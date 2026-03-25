@@ -23,6 +23,12 @@ public class Save
    private List<Point> _clickedPoints = new List<Point>();
    private List<int> _pointOwners = new List<int>();
    private List<SavedMissile> _missiles = new List<SavedMissile>();
+
+   // Paramètres de grille
+   public int GridColumns { get; set; }
+   public int GridRows { get; set; }
+   public int PointsToWin { get; set; }
+
    private static string path = "C:/Users/ACER/Documents/L2/C#/point/save/save.txt";
 
 /// Propriété pour la gestion de la sauvegarde des points
@@ -70,6 +76,9 @@ public class Save
         ClickedPoints = points;
         PointOwners = owners;
         _missiles = new List<SavedMissile>();
+        GridColumns = GameConfig.GridColumns;
+        GridRows = GameConfig.GridRows;
+        PointsToWin = GameConfig.PointsToWin;
     }
 
     // Constructeur par défaut
@@ -78,6 +87,9 @@ public class Save
         _clickedPoints = new List<Point>();
         _pointOwners = new List<int>();
         _missiles = new List<SavedMissile>();
+        GridColumns = GameConfig.GridColumns;
+        GridRows = GameConfig.GridRows;
+        PointsToWin = GameConfig.PointsToWin;
     }
 
     /// <summary>
@@ -126,10 +138,16 @@ public class Save
         }
     }
 
-/// sauvegarde des donnés de jeux (points + missiles)
+/// sauvegarde des donnés de jeux (points + missiles + configuration grille)
     public void Write(string player1, string player2)
     {
         StringBuilder data = new StringBuilder();
+
+        // Section CONFIG - Paramètres de la grille
+        data.AppendLine("CONFIG");
+        data.AppendFormat("GridColumns={0}\n", GridColumns);
+        data.AppendFormat("GridRows={0}\n", GridRows);
+        data.AppendFormat("PointsToWin={0}\n", PointsToWin);
 
         // Ligne 1 : Noms des joueurs
         data.AppendFormat("{0} - {1}\n", player1, player2);
@@ -229,12 +247,63 @@ public class Save
     }
 
     /// <summary>
-    /// Retourne la liste des propriétaires chargés depuis le fichier
+    /// Charge les paramètres de configuration de la grille depuis le fichier sauvegardé
     /// Doit être appelé après getPointList()
     /// </summary>
-    public List<int> getPointOwners()
+    public void LoadGameConfig()
     {
-        return _pointOwners;
+        // Réinitialiser aux valeurs par défaut de GameConfig
+        GridColumns = GameConfig.GridColumns;
+        GridRows = GameConfig.GridRows;
+        PointsToWin = GameConfig.PointsToWin;
+
+        if (!File.Exists(path))
+            return;
+
+        using (StreamReader reader = new StreamReader(path))
+        {
+            string ligne;
+
+            while ((ligne = reader.ReadLine()) != null)
+            {
+                // Arrêter à la première section non-CONFIG
+                if (ligne.Trim() == "POINTS" || ligne.Trim() == "MISSILES" || ligne.Contains(" - "))
+                {
+                    break;
+                }
+
+                // Parser les paramètres de la section CONFIG
+                if (ligne.Contains("="))
+                {
+                    string[] parts = ligne.Split('=');
+                    if (parts.Length == 2)
+                    {
+                        string key = parts[0].Trim();
+                        string value = parts[1].Trim();
+
+                        try
+                        {
+                            switch (key)
+                            {
+                                case "GridColumns":
+                                    GridColumns = int.Parse(value);
+                                    break;
+                                case "GridRows":
+                                    GridRows = int.Parse(value);
+                                    break;
+                                case "PointsToWin":
+                                    PointsToWin = int.Parse(value);
+                                    break;
+                            }
+                        }
+                        catch
+                        {
+                            // Ignorer les valeurs mal formées
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -324,5 +393,14 @@ public class Save
             }
         }
         return obj;
+    }
+
+    /// <summary>
+    /// Retourne la liste des propriétaires chargés depuis le fichier
+    /// Doit être appelé après getPointList()
+    /// </summary>
+    public List<int> getPointOwners()
+    {
+        return _pointOwners;
     }
 }

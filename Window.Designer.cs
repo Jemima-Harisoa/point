@@ -468,6 +468,13 @@ partial class Window
             Save sauvegarde = new Save();
             clickedPoints = sauvegarde.getPointList();
             pointOwners = sauvegarde.getPointOwners();
+
+            // Charger et appliquer les paramètres de la grille
+            sauvegarde.LoadGameConfig();
+            GameConfig.SetGridDimensions(sauvegarde.GridColumns, sauvegarde.GridRows);
+            GameConfig.PointsToWin = sauvegarde.PointsToWin;
+            GameConfig.PointsForCanWin = Math.Max(1, GameConfig.PointsToWin - 1);
+
             actionHistory = new List<int>();
 
             // S'assurer que pointOwners a la bonne taille (par défaut i % 2 si pas d'info)
