@@ -586,10 +586,6 @@ partial class Window
         {
             // Calculer le joueur actuel en incluant les missiles lancés
             int totalActions = clickedPoints.Count + missilesThrownCount;
-            Player currentPlayer = (totalActions % 2 == 0) ? player1 : player2;
-
-            // Bloquer le clic si le joueur courant a déjà lancé un missile ce tour
-            if (currentPlayer.HasLaunchedMissileThisTurn) return;
 
             // Ignorer les clics dans les zones d'encoches (pour éviter de placer des points)
             if (leftNotchBounds.Contains(e.Location) || rightNotchBounds.Contains(e.Location)) return;
@@ -949,13 +945,6 @@ partial class Window
             return;
         }
 
-        // Vérifier si le joueur a déjà lancé un missile ce tour
-        if (player.HasLaunchedMissileThisTurn)
-        {
-            MessageBox.Show("Vous avez déjà lancé un missile ce tour !");
-            return;
-        }
-
         if (!game)
         {
             MessageBox.Show("Le jeu n'a pas commencé !");
@@ -992,11 +981,9 @@ partial class Window
         // Démarrer le Timer pour l'animation
         missileAnimationTimer.Start();
 
-        // Marquer le missile comme lancé et passer au tour suivant IMMÉDIATEMENT
-        player.HasLaunchedMissileThisTurn = true;
+        // Le tir consomme le tour immédiatement
         missilesThrownCount++; // Incrémenter pour changer le tour
         tour++;
-        adversaire.ResetTurn();
 
         _isDirty = true;
         space.Invalidate();

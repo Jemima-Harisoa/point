@@ -16,6 +16,7 @@ namespace point
         public Color OwnerColor { get; set; }
         public int Direction { get; set; } // 1 = droite, -1 = gauche
         public int CurrentStep { get; set; } // Pour l'animation
+        public bool HitTarget { get; set; }
         private List<Point> Trajectory { get; set; }
         #endregion
 
@@ -25,6 +26,7 @@ namespace point
             State = MissileState.Ready;
             Trajectory = new List<Point>();
             CurrentStep = 0;
+            HitTarget = false;
         }
 
         /// <summary>
@@ -39,6 +41,7 @@ namespace point
             Direction = direction;
             Trajectory = new List<Point>();
             CurrentStep = 0;
+            HitTarget = false;
 
             // Nouvelle formule : distance_max = floor((puissance × max_colonnes) / 9)
             int maxColumns = GameConfig.GridColumns;
@@ -142,12 +145,30 @@ namespace point
             }
             else if (State == MissileState.Destroyed && Trajectory.Count > 0)
             {
-                // Dessiner un cercle orange/rouge semi-transparent pour montrer l'impact
-                Point impact = Trajectory[Trajectory.Count - 1];
-                Color explosionColor = Color.FromArgb(180, 255, 80, 0);
-                using (Brush brush = new SolidBrush(explosionColor))
+                Point impact = GetCurrentPosition();
+                if (HitTarget)
                 {
-                    e.Graphics.FillEllipse(brush, impact.X - 10, impact.Y - 10, 20, 20);
+                    // Collision: marquer avec un cercle plein
+                    Color explosionColor = Color.FromArgb(170, OwnerColor.R, OwnerColor.G, OwnerColor.B);
+                    using (Brush brush = new SolidBrush(explosionColor))
+                    {
+                        e.Graphics.FillEllipse(brush, impact.X - 10, impact.Y - 10, 20, 20);
+                    }
+
+                    using (Pen pen = new Pen(Color.FromArgb(220, OwnerColor), 2))
+                    {
+                        e.Graphics.DrawEllipse(pen, impact.X - 10, impact.Y - 10, 20, 20);
+                    }
+                }
+                else
+                {
+                    // Pas de collision: marquer le point d'impact avec une croix
+                    using (Pen crossPen = new Pen(Color.FromArgb(230, OwnerColor), 2))
+                    {
+                        int size = 8;
+                        e.Graphics.DrawLine(crossPen, impact.X - size, impact.Y - size, impact.X + size, impact.Y + size);
+                        e.Graphics.DrawLine(crossPen, impact.X - size, impact.Y + size, impact.X + size, impact.Y - size);
+                    }
                 }
             }
         }
