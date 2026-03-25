@@ -28,12 +28,19 @@
     - [X] Gérer les interactions entre les missiles et les points ennemis, en mettant à jour l'état du jeu en conséquence (ex : destruction du point ennemi, mise à jour de la grille, etc.).
 - [X] Ajouter un input pour parametrer le nombre de colone de et ligne de la grille avec le showdialog de la classe window.designer.cs
 
-### [] Persistance de données : PostgresQl
-- [] Modeliser le schema de donnees pour le jeu de point, en identifiant les entités principales (joueurs, parties, scores, etc.) et leurs relations.
-- [] Intégrer une base de données PostgreSQL pour stocker les informations sur les joueurs, les parties, les scores, etc.
-    - [] Créer une classe `DatabaseManager` pour gérer les interactions avec la base de données (connexion, requêtes, etc.).
-    - [] Stocker les informations sur les joueurs (nom, score, etc.) et les parties (date, durée, résultat, etc.) dans la base de données.
-    - [] Permettre aux joueurs de consulter leur historique de parties et leurs scores via l'interface utilisateur. 
-    - [] Continuer la sauvegarde local du jeu et mettre un modal pour determiner si on migre la partie en cours la base de donne ou si on continue la partie en cours localement. 
+### [X] Persistance de données : PostgresQl
+- [X] Modeliser le schema de donnees pour le jeu de point, en identifiant les entités principales (joueurs, parties, scores, etc.) et leurs relations.
+- [X] Intégrer une base de données PostgreSQL pour stocker les informations sur les joueurs, les parties, les scores, etc.
+    - [X] Créer une classe `DatabaseManager` pour gérer les interactions avec la base de données (connexion, requêtes, etc.).
+    - [X] Créer les modèles de données (PlayerModel, GameModel, GamePointModel, MissileActionModel)
+    - [X] Implémenter l'historisation complète (soft delete) des points supprimés
+    - [X] Enregistrer les missiles avec point d'impact et joueur lanceur
+    - [X] Stocker les informations sur les joueurs (nom, score, etc.) et les parties (date, durée, résultat, etc.) dans la base de données.
+    - [X] Créer GameSaveManager pour gérer sauvegarde hybride (local + PostgreSQL)
+    - [ ] Permettre aux joueurs de consulter leur historique de parties et leurs scores via l'interface utilisateur.
+    - [X] Continuer la sauvegarde local du jeu.
+    - [ ] Mettre un modal pour determiner si on migre la partie en cours en base de donnees ou si on continue la partie en cours localement.
 
-- [] Ajouter un environnemt de dev sur docker pour faciliter le développement et la gestion de la base de données PostgreSQL.
+- [X] Ajouter un environnemt de dev sur docker pour faciliter le développement et la gestion de la base de données PostgreSQL.
+    - [X] Créer docker-compose.yml pour PostgreSQL
+    - [X] Créer le schéma SQL complet avec tables, index, vues et fonctions
