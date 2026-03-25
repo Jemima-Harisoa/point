@@ -26,6 +26,8 @@ partial class Window
     private bool isSelectingMissileLine = false; // Mode sélection ligne pour missile
     private Player missileLaunchingPlayer = null; // Joueur qui veut lancer un missile
     private Label currentMissileLineLabel = null; // Référence au label de ligne à mettre à jour
+    private Label player1LineLabel = null; // Label de ligne pour joueur 1
+    private Label player2LineLabel = null; // Label de ligne pour joueur 2
     private int selectedMissilePower = 3; // Puissance calibrée par le joueur
     private int missilesThrownCount = 0; // Compteur de missiles lancés (pour le calcul du tour) 
     protected override void Dispose(bool disposing)
@@ -465,62 +467,34 @@ partial class Window
         }
 
         // === DÉTECTION DES CLICS SUR LES ENCOCHES ===
-        int notchWidth = 15;
+        int notchWidth = 20; // Même taille que dans paint()
         int gridSize = GameConfig.GridSize;
 
-        // Encoche GAUCHE (Joueur 1)
+        // Encoche GAUCHE (Joueur 1) - utilise la référence directe
         if (e.X <= notchWidth && game && hasStarted)
         {
             int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
             if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
             {
-                // Activer le mode sélection pour joueur 1
-                isSelectingMissileLine = true;
-                missileLaunchingPlayer = player1;
-
-                // Trouver le label du joueur 1 dans MissileBar
-                var leftPanel = this.Controls.OfType<TableLayoutPanel>().First()
-                    .Controls.OfType<Panel>().Where(p => p.Dock == DockStyle.Left).FirstOrDefault();
-                if (leftPanel != null)
+                // Mettre à jour directement le label du joueur 1
+                if (player1LineLabel != null)
                 {
-                    var flowLayout = leftPanel.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
-                    if (flowLayout != null)
-                    {
-                        currentMissileLineLabel = flowLayout.Controls.Find("lineValueLabel", false).FirstOrDefault() as Label;
-                        if (currentMissileLineLabel != null)
-                        {
-                            currentMissileLineLabel.Text = clickedRow.ToString();
-                        }
-                    }
+                    player1LineLabel.Text = clickedRow.ToString();
                 }
                 return;
             }
         }
 
-        // Encoche DROITE (Joueur 2)
+        // Encoche DROITE (Joueur 2) - utilise la référence directe
         if (e.X >= space.Width - notchWidth && game && hasStarted)
         {
             int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
             if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
             {
-                // Activer le mode sélection pour joueur 2
-                isSelectingMissileLine = true;
-                missileLaunchingPlayer = player2;
-
-                // Trouver le label du joueur 2 dans MissileBar
-                var rightPanel = this.Controls.OfType<TableLayoutPanel>().First()
-                    .Controls.OfType<Panel>().Where(p => p.Dock == DockStyle.Right).FirstOrDefault();
-                if (rightPanel != null)
+                // Mettre à jour directement le label du joueur 2
+                if (player2LineLabel != null)
                 {
-                    var flowLayout = rightPanel.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
-                    if (flowLayout != null)
-                    {
-                        currentMissileLineLabel = flowLayout.Controls.Find("lineValueLabel", false).FirstOrDefault() as Label;
-                        if (currentMissileLineLabel != null)
-                        {
-                            currentMissileLineLabel.Text = clickedRow.ToString();
-                        }
-                    }
+                    player2LineLabel.Text = clickedRow.ToString();
                 }
                 return;
             }
@@ -627,30 +601,52 @@ partial class Window
         int gridSize = GameConfig.GridSize;
         Pen BlackPen = new Pen(Color.Black, 2);
 
-        // Marge pour éviter que la dernière ligne touche les bordures
-        int margin = gridSize / 2;
+        // Zone d'encoches sur les côtés
+        int notchWidth = 20;
 
-        // Tracer les lignes verticales (avec marge)
-        for(int i = gridSize; i < space.Width - margin; i += gridSize){
-            graph.DrawLine(BlackPen, i, margin, i, space.Height - margin);
+        // Tracer les lignes verticales (de la zone de jeu, entre les encoches)
+        for(int col = 1; col <= GameConfig.GridColumns; col++){
+            int x = notchWidth + (col - 1) * gridSize;
+            if (x < space.Width - notchWidth)
+            {
+                graph.DrawLine(BlackPen, x, 0, x, space.Height);
+            }
         }
 
-        // Tracer les lignes horizontales (avec marge)
-        for(int j = gridSize; j < space.Height - margin; j += gridSize){
-            graph.DrawLine(BlackPen, margin, j, space.Width - margin, j);
+        // Tracer les lignes horizontales
+        for(int row = 1; row <= GameConfig.GridRows; row++){
+            int y = row * gridSize;
+            graph.DrawLine(BlackPen, notchWidth, y, space.Width - notchWidth, y);
+        }
+
+        // === NUMÉROS DE LIGNES ET COLONNES ===
+        Font numberFont = new Font("Arial", 8, FontStyle.Bold);
+
+        // Numéros de lignes (sur les encoches gauches)
+        for (int row = 1; row <= GameConfig.GridRows; row++)
+        {
+            int yPos = row * gridSize;
+            string rowNum = row.ToString();
+            SizeF textSize = graph.MeasureString(rowNum, numberFont);
+
+            // Numéro sur encoche gauche (rouge)
+            graph.DrawString(rowNum, numberFont, Brushes.DarkRed,
+                notchWidth / 2 - textSize.Width / 2, yPos - textSize.Height / 2);
+
+            // Numéro sur encoche droite (bleu)
+            graph.DrawString(rowNum, numberFont, Brushes.DarkBlue,
+                space.Width - notchWidth / 2 - textSize.Width / 2, yPos - textSize.Height / 2);
         }
 
         // === ENCOCHES DE SÉLECTION DE LIGNE POUR MISSILES ===
-        // Côté gauche (Joueur 1 - Rouge) et Côté droit (Joueur 2 - Bleu)
-        int notchWidth = 15;
-        int notchHeight = gridSize / 3;
+        int notchHeight = gridSize / 2;
 
         for (int row = 1; row <= GameConfig.GridRows; row++)
         {
             int yPos = row * gridSize;
 
             // Encoche GAUCHE (Joueur 1 - Rouge)
-            using (Brush redBrush = new SolidBrush(Color.FromArgb(200, 255, 100, 100)))
+            using (Brush redBrush = new SolidBrush(Color.FromArgb(150, 255, 150, 150)))
             {
                 graph.FillRectangle(redBrush, 0, yPos - notchHeight / 2, notchWidth, notchHeight);
             }
@@ -660,7 +656,7 @@ partial class Window
             }
 
             // Encoche DROITE (Joueur 2 - Bleu)
-            using (Brush blueBrush = new SolidBrush(Color.FromArgb(200, 100, 100, 255)))
+            using (Brush blueBrush = new SolidBrush(Color.FromArgb(150, 150, 150, 255)))
             {
                 graph.FillRectangle(blueBrush, space.Width - notchWidth, yPos - notchHeight / 2, notchWidth, notchHeight);
             }
@@ -773,6 +769,12 @@ partial class Window
         lineValueLabel.Font = new Font(lineValueLabel.Font, FontStyle.Bold);
         lineValueLabel.ForeColor = Color.Blue;
         layout.Controls.Add(lineValueLabel);
+
+        // Stocker la référence au label pour ce joueur
+        if (player == player1)
+            player1LineLabel = lineValueLabel;
+        else
+            player2LineLabel = lineValueLabel;
 
         Button selectLineButton = new Button();
         selectLineButton.Text = "📍 Choisir ligne sur grille";
