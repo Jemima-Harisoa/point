@@ -26,7 +26,8 @@ partial class Window
     private bool isSelectingMissileLine = false; // Mode sélection ligne pour missile
     private Player missileLaunchingPlayer = null; // Joueur qui veut lancer un missile
     private Label currentMissileLineLabel = null; // Référence au label de ligne à mettre à jour
-    private int selectedMissilePower = 3; // Puissance calibrée par le joueur 
+    private int selectedMissilePower = 3; // Puissance calibrée par le joueur
+    private int missilesThrownCount = 0; // Compteur de missiles lancés (pour le calcul du tour) 
     protected override void Dispose(bool disposing)
     {
         if (disposing && (components != null))
@@ -178,6 +179,7 @@ partial class Window
             player2.Missiles.Clear();
             player1.HasLaunchedMissileThisTurn = false;
             player2.HasLaunchedMissileThisTurn = false;
+            missilesThrownCount = 0; // Réinitialiser le compteur de missiles
             label1.BackColor = Color.Red;
             _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate();
@@ -437,7 +439,7 @@ partial class Window
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
-        // Mode sélection de ligne pour missile
+        // Mode sélection de ligne pour missile (via bouton "Choisir ligne")
         if (isSelectingMissileLine && missileLaunchingPlayer != null && currentMissileLineLabel != null)
         {
             // Calculer la ligne cliquée (1-indexed)
@@ -462,15 +464,82 @@ partial class Window
             return;
         }
 
+        // === DÉTECTION DES CLICS SUR LES ENCOCHES ===
+        int notchWidth = 15;
+        int gridSize = GameConfig.GridSize;
+
+        // Encoche GAUCHE (Joueur 1)
+        if (e.X <= notchWidth && game && hasStarted)
+        {
+            int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
+            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            {
+                // Activer le mode sélection pour joueur 1
+                isSelectingMissileLine = true;
+                missileLaunchingPlayer = player1;
+
+                // Trouver le label du joueur 1 dans MissileBar
+                var leftPanel = this.Controls.OfType<TableLayoutPanel>().First()
+                    .Controls.OfType<Panel>().Where(p => p.Dock == DockStyle.Left).FirstOrDefault();
+                if (leftPanel != null)
+                {
+                    var flowLayout = leftPanel.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+                    if (flowLayout != null)
+                    {
+                        currentMissileLineLabel = flowLayout.Controls.Find("lineValueLabel", false).FirstOrDefault() as Label;
+                        if (currentMissileLineLabel != null)
+                        {
+                            currentMissileLineLabel.Text = clickedRow.ToString();
+                        }
+                    }
+                }
+                return;
+            }
+        }
+
+        // Encoche DROITE (Joueur 2)
+        if (e.X >= space.Width - notchWidth && game && hasStarted)
+        {
+            int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
+            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            {
+                // Activer le mode sélection pour joueur 2
+                isSelectingMissileLine = true;
+                missileLaunchingPlayer = player2;
+
+                // Trouver le label du joueur 2 dans MissileBar
+                var rightPanel = this.Controls.OfType<TableLayoutPanel>().First()
+                    .Controls.OfType<Panel>().Where(p => p.Dock == DockStyle.Right).FirstOrDefault();
+                if (rightPanel != null)
+                {
+                    var flowLayout = rightPanel.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+                    if (flowLayout != null)
+                    {
+                        currentMissileLineLabel = flowLayout.Controls.Find("lineValueLabel", false).FirstOrDefault() as Label;
+                        if (currentMissileLineLabel != null)
+                        {
+                            currentMissileLineLabel.Text = clickedRow.ToString();
+                        }
+                    }
+                }
+                return;
+            }
+        }
+
         if (game && hasStarted)
         {
+            // Calculer le joueur actuel en incluant les missiles lancés
+            int totalActions = clickedPoints.Count + missilesThrownCount;
+            Player currentPlayer = (totalActions % 2 == 0) ? player1 : player2;
+
             // Bloquer le clic si le joueur courant a déjà lancé un missile ce tour
-            Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
             if (currentPlayer.HasLaunchedMissileThisTurn) return;
+
+            // Ignorer les clics dans les zones d'encoches (pour éviter de placer des points)
+            if (e.X <= notchWidth || e.X >= space.Width - notchWidth) return;
 
             // Utiliser les paramètres de GameConfig pour flexibilité
             int tolerance = GameConfig.ClickTolerance;
-            int gridSize = GameConfig.GridSize;
 
             // Trouver l'intersection la plus proche
             int nearestX = (int)Math.Round(e.X / (double)gridSize) * gridSize;
@@ -485,17 +554,12 @@ partial class Window
                 if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
                     && !clickedPoints.Contains(p))
                 {
-                    // Calculer quel joueur devrait jouer selon le nombre de coups
-                    // Le nombre de points déjà placés détermine l'ordre:
-                    // clickedPoints.Count pair (0,2,4...) → prochain joueur est type 0 (joueur 1)
-                    // clickedPoints.Count impair (1,3,5...) → prochain joueur est type 1 (joueur 2)
-                    // Avec inversed, les rôles peuvent être inversés
-                    int expectedType = clickedPoints.Count % 2;
+                    // Calculer quel joueur devrait jouer selon le nombre de coups + missiles
+                    int expectedType = totalActions % 2;
                     if(inversed) expectedType = (expectedType + 1) % 2;
 
                     // Pour un contrôle strict: rejeter silencieusement les clics hors tour
                     // Les joueurs doivent respecter l'alternance manuellement
-                    // (Dans une future version, on pourrait afficher "Ce n'est pas votre tour")
                     add(p);
                 }
             }
@@ -563,14 +627,47 @@ partial class Window
         int gridSize = GameConfig.GridSize;
         Pen BlackPen = new Pen(Color.Black, 2);
 
-        // Tracer les lignes verticales
-        for(int i = gridSize; i < space.Width; i += gridSize){
-            graph.DrawLine(BlackPen, i, 0, i, space.Height);
+        // Marge pour éviter que la dernière ligne touche les bordures
+        int margin = gridSize / 2;
+
+        // Tracer les lignes verticales (avec marge)
+        for(int i = gridSize; i < space.Width - margin; i += gridSize){
+            graph.DrawLine(BlackPen, i, margin, i, space.Height - margin);
         }
 
-        // Tracer les lignes horizontales
-        for(int j = gridSize; j < space.Height; j += gridSize){
-            graph.DrawLine(BlackPen, 0, j, space.Width, j);
+        // Tracer les lignes horizontales (avec marge)
+        for(int j = gridSize; j < space.Height - margin; j += gridSize){
+            graph.DrawLine(BlackPen, margin, j, space.Width - margin, j);
+        }
+
+        // === ENCOCHES DE SÉLECTION DE LIGNE POUR MISSILES ===
+        // Côté gauche (Joueur 1 - Rouge) et Côté droit (Joueur 2 - Bleu)
+        int notchWidth = 15;
+        int notchHeight = gridSize / 3;
+
+        for (int row = 1; row <= GameConfig.GridRows; row++)
+        {
+            int yPos = row * gridSize;
+
+            // Encoche GAUCHE (Joueur 1 - Rouge)
+            using (Brush redBrush = new SolidBrush(Color.FromArgb(200, 255, 100, 100)))
+            {
+                graph.FillRectangle(redBrush, 0, yPos - notchHeight / 2, notchWidth, notchHeight);
+            }
+            using (Pen redPen = new Pen(Color.DarkRed, 1))
+            {
+                graph.DrawRectangle(redPen, 0, yPos - notchHeight / 2, notchWidth, notchHeight);
+            }
+
+            // Encoche DROITE (Joueur 2 - Bleu)
+            using (Brush blueBrush = new SolidBrush(Color.FromArgb(200, 100, 100, 255)))
+            {
+                graph.FillRectangle(blueBrush, space.Width - notchWidth, yPos - notchHeight / 2, notchWidth, notchHeight);
+            }
+            using (Pen bluePen = new Pen(Color.DarkBlue, 1))
+            {
+                graph.DrawRectangle(bluePen, space.Width - notchWidth, yPos - notchHeight / 2, notchWidth, notchHeight);
+            }
         }
 
         // Dessiner les points colorés aux emplacements cliqués
@@ -579,6 +676,13 @@ partial class Window
 
         foreach (var point in clickedPoints)
         {
+            // Ignorer les points supprimés (masqués avec -1,-1)
+            if (point.X < 0 || point.Y < 0)
+            {
+                k++;
+                continue;
+            }
+
             if(k % 2 == 0){
                 graph.FillEllipse(Brushes.Red, point.X - 5, point.Y - 5, 10, 10);
                 label1.BackColor = Color.White;
@@ -758,8 +862,9 @@ partial class Window
     /// </summary>
     private void LaunchMissileWithAnimation(Player player, Player adversaire, int row, int power)
     {
-        // Vérifier si c'est le tour du joueur
-        Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
+        // Vérifier si c'est le tour du joueur (inclut les missiles lancés)
+        int totalActions = clickedPoints.Count + missilesThrownCount;
+        Player currentPlayer = (totalActions % 2 == 0) ? player1 : player2;
         if (currentPlayer != player)
         {
             MessageBox.Show("Ce n'est pas votre tour !");
@@ -809,6 +914,7 @@ partial class Window
 
         // Marquer le missile comme lancé et passer au tour suivant IMMÉDIATEMENT
         player.HasLaunchedMissileThisTurn = true;
+        missilesThrownCount++; // Incrémenter pour changer le tour
         tour++;
         adversaire.ResetTurn();
 
