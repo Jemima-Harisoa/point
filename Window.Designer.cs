@@ -479,9 +479,18 @@ partial class Window
                 }
             }
 
-            for (int i = 0; i < clickedPoints.Count; i++)
+            // CORRECTION: Reconstruire actionHistory pour maintenir la parité correcte
+            int expectedPlayer = 0; // 0 ou 1, alterne après chaque point
+            foreach (int owner in pointOwners)
             {
-                actionHistory.Add(0);
+                // Ajouter des missiles placeholders si le propriétaire ne correspond pas à la parité attendue
+                while (owner != expectedPlayer)
+                {
+                    actionHistory.Add(1); // Ajouter un placeholder missile pour changer la parité
+                    expectedPlayer = 1 - expectedPlayer; // Alterner
+                }
+                actionHistory.Add(0); // Ajouter le point
+                expectedPlayer = 1 - expectedPlayer; // Alterner pour le prochain point
             }
 
             // Charger et restaurer les missiles
@@ -514,6 +523,12 @@ partial class Window
                     missiles1Count++;
                 else
                     missiles2Count++;
+            }
+
+            // Ajouter les missiles à actionHistory pour maintenir l'ordre correct
+            for (int i = 0; i < savedMissiles.Count; i++)
+            {
+                actionHistory.Add(1); // 1 pour missile
             }
 
             // DEBUG: Log des missiles après chargement
