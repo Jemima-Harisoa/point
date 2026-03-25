@@ -19,7 +19,14 @@ partial class Window
     private bool game = false;
 
     // Optimisation du rendu : drapeau pour savoir si on doit redessiner
-    private bool _isDirty = true; 
+    private bool _isDirty = true;
+
+    // Missile animation et sélection de ligne
+    private System.Windows.Forms.Timer missileAnimationTimer;
+    private bool isSelectingMissileLine = false; // Mode sélection ligne pour missile
+    private Player missileLaunchingPlayer = null; // Joueur qui veut lancer un missile
+    private Label currentMissileLineLabel = null; // Référence au label de ligne à mettre à jour
+    private int selectedMissilePower = 3; // Puissance calibrée par le joueur 
     protected override void Dispose(bool disposing)
     {
         if (disposing && (components != null))
@@ -44,6 +51,12 @@ partial class Window
         this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
         this.ClientSize = new System.Drawing.Size(800, 600);
         this.Text = "Jeu de point";
+
+        // Initialiser le Timer pour l'animation des missiles
+        missileAnimationTimer = new System.Windows.Forms.Timer(this.components);
+        missileAnimationTimer.Interval = 100; // 100ms entre chaque frame
+        missileAnimationTimer.Tick += MissileAnimationTimer_Tick;
+
         Panel Score  = new Panel();
         Panel LeftInterface = new Panel();
         Panel RightInterface = new Panel();
@@ -336,6 +349,7 @@ partial class Window
         };
        return LoadButton;
     }
+
     /// <summary>
     /// Bouton d'aide stratégique suggérant le meilleur coup à jouer pour un joueur.
     /// Utilise une IA simple en quatre étapes : 
@@ -423,6 +437,31 @@ partial class Window
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
+        // Mode sélection de ligne pour missile
+        if (isSelectingMissileLine && missileLaunchingPlayer != null && currentMissileLineLabel != null)
+        {
+            // Calculer la ligne cliquée (1-indexed)
+            int clickedRow = (int)Math.Round(e.Y / (double)GameConfig.GridSize);
+
+            // Vérifier que la ligne est valide
+            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            {
+                // Mettre à jour directement le label via la référence stockée
+                currentMissileLineLabel.Text = clickedRow.ToString();
+                MessageBox.Show($"Ligne {clickedRow} sélectionnée !");
+            }
+            else
+            {
+                MessageBox.Show("Ligne invalide ! Cliquez sur une ligne de la grille.");
+            }
+
+            // Désactiver le mode sélection
+            isSelectingMissileLine = false;
+            missileLaunchingPlayer = null;
+            currentMissileLineLabel = null;
+            return;
+        }
+
         if (game && hasStarted)
         {
             // Bloquer le clic si le joueur courant a déjà lancé un missile ce tour
@@ -595,6 +634,7 @@ partial class Window
 
     /// <summary>
     /// Crée et retourne un panel avec la barre de lancement de missile pour un joueur
+    /// Jauge verticale, sélection de ligne par clic sur grille, bouton Lancer
     /// </summary>
     private Panel MissileBar(Player player, Player adversaire)
     {
@@ -611,59 +651,97 @@ partial class Window
 
         // Titre
         Label titleLabel = new Label();
-        titleLabel.Text = $"Missile - {player.nom}";
+        titleLabel.Text = $"🚀 Missile - {player.nom}";
         titleLabel.AutoSize = true;
         titleLabel.Font = new Font(titleLabel.Font, FontStyle.Bold);
         layout.Controls.Add(titleLabel);
 
-        // Ligne de départ
+        // Sélection de ligne
         Label lineLabel = new Label();
-        lineLabel.Text = "Ligne de tir (1-" + GameConfig.GridRows + "):";
+        lineLabel.Text = "Ligne de tir:";
         lineLabel.AutoSize = true;
         layout.Controls.Add(lineLabel);
 
-        NumericUpDown rowInput = new NumericUpDown();
-        rowInput.Name = "rowInput";
-        rowInput.Minimum = 1;
-        rowInput.Maximum = GameConfig.GridRows;
-        rowInput.Value = GameConfig.GridRows / 2;
-        rowInput.Width = 180;
-        layout.Controls.Add(rowInput);
+        Label lineValueLabel = new Label();
+        lineValueLabel.Name = "lineValueLabel";
+        lineValueLabel.Text = "Aucune";
+        lineValueLabel.AutoSize = true;
+        lineValueLabel.Font = new Font(lineValueLabel.Font, FontStyle.Bold);
+        lineValueLabel.ForeColor = Color.Blue;
+        layout.Controls.Add(lineValueLabel);
 
-        // Puissance
+        Button selectLineButton = new Button();
+        selectLineButton.Text = "📍 Choisir ligne sur grille";
+        selectLineButton.Width = 180;
+        selectLineButton.Height = 35;
+        selectLineButton.Click += (s, e) =>
+        {
+            isSelectingMissileLine = true;
+            missileLaunchingPlayer = player;
+            MessageBox.Show("Cliquez sur la grille pour choisir une ligne de tir !");
+        };
+        layout.Controls.Add(selectLineButton);
+
+        // Puissance - Jauge VERTICALE
         Label powerLabel = new Label();
         powerLabel.Text = "Puissance (1-9):";
         powerLabel.AutoSize = true;
         layout.Controls.Add(powerLabel);
 
         Label powerInfo = new Label();
-        powerInfo.Text = "(9 = jusqu'au bout de la grille)";
+        powerInfo.Text = "(9 = portée max)";
         powerInfo.AutoSize = true;
         powerInfo.Font = new Font(powerInfo.Font.FontFamily, 8, FontStyle.Italic);
         layout.Controls.Add(powerInfo);
 
+        // TrackBar VERTICAL
         TrackBar powerSlider = new TrackBar();
         powerSlider.Name = "powerSlider";
+        powerSlider.Orientation = Orientation.Vertical; // VERTICAL !
         powerSlider.Minimum = 1;
         powerSlider.Maximum = 9;
         powerSlider.Value = 5;
-        powerSlider.Width = 180;
+        powerSlider.Height = 150; // Plus grand pour une jauge verticale
+        powerSlider.Width = 50;
+        powerSlider.TickFrequency = 1;
         layout.Controls.Add(powerSlider);
 
         Label powerValue = new Label();
         powerValue.Text = "5";
         powerValue.AutoSize = true;
+        powerValue.Font = new Font(powerValue.Font, FontStyle.Bold);
         layout.Controls.Add(powerValue);
 
-        // Mise à jour du label de puissance
-        powerSlider.ValueChanged += (s, e) => powerValue.Text = powerSlider.Value.ToString();
+        // Mise à jour du label de puissance et stockage dans variable globale
+        powerSlider.ValueChanged += (s, e) =>
+        {
+            powerValue.Text = powerSlider.Value.ToString();
+            selectedMissilePower = powerSlider.Value;
+        };
 
         // Bouton de lancement
         Button launchButton = new Button();
-        launchButton.Text = "🚀 Lancer !";
+        launchButton.Text = "🚀 LANCER !";
         launchButton.Width = 180;
-        launchButton.Height = 40;
-        launchButton.Click += (s, e) => LaunchMissile(player, adversaire, (int)rowInput.Value, powerSlider.Value);
+        launchButton.Height = 45;
+        launchButton.BackColor = Color.FromArgb(255, 100, 100);
+        launchButton.ForeColor = Color.White;
+        launchButton.Font = new Font(launchButton.Font, FontStyle.Bold);
+        launchButton.Click += (s, e) =>
+        {
+            // Vérifier qu'une ligne a été sélectionnée
+            if (lineValueLabel.Text == "Aucune")
+            {
+                MessageBox.Show("Veuillez d'abord choisir une ligne de tir !");
+                return;
+            }
+
+            int selectedRow = int.Parse(lineValueLabel.Text);
+            LaunchMissileWithAnimation(player, adversaire, selectedRow, powerSlider.Value);
+
+            // Réinitialiser la sélection
+            lineValueLabel.Text = "Aucune";
+        };
         layout.Controls.Add(launchButton);
 
         missilePanel.Controls.Add(layout);
@@ -674,7 +752,11 @@ partial class Window
     /// Gère le lancement d'un missile
     /// Le missile part toujours du bord gauche (colonne 0) et va horizontalement vers la droite
     /// </summary>
-    private void LaunchMissile(Player player, Player adversaire, int row, int power)
+    /// <summary>
+    /// Gère le lancement d'un missile avec animation
+    /// Le missile part du bord gauche (player1) ou droit (player2) selon le joueur
+    /// </summary>
+    private void LaunchMissileWithAnimation(Player player, Player adversaire, int row, int power)
     {
         // Vérifier si c'est le tour du joueur
         Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
@@ -697,28 +779,35 @@ partial class Window
             return;
         }
 
-        // Calculer la position de départ : bord gauche (x=0) sur la ligne choisie
+        // Déterminer la direction selon le joueur
+        // Player 1 (à gauche) : direction = 1 (vers la droite)
+        // Player 2 (à droite) : direction = -1 (vers la gauche)
+        int direction = (player == player1) ? 1 : -1;
+
+        // Calculer la position de départ selon le joueur et la ligne
         // row commence à 1 dans l'UI, donc on soustrait 1 pour avoir l'index de grille
-        Point launchPosition = new Point(0, (row - 1) * GameConfig.GridSize);
+        int yPosition = (row - 1) * GameConfig.GridSize;
+        Point launchPosition;
 
-        // Créer et lancer le missile (toujours horizontal)
-        Missile missile = player.CreateMissile();
-        missile.Launch(launchPosition, power);
-
-        // Vérifier les collisions
-        List<Point> enemyPoints = adversaire.line.GetPlayerPoints();
-        if (missile.CheckCollision(enemyPoints))
+        if (player == player1)
         {
-            // Récupérer le point touché et le supprimer
-            List<Point> trajectory = missile.GetTrajectory();
-            if (trajectory.Count > 0)
-            {
-                Point impactPoint = trajectory[trajectory.Count - 1];
-                RemoveEnemyPoint(impactPoint, adversaire);
-            }
+            // Player 1 : part du bord gauche (x = 0)
+            launchPosition = new Point(0, yPosition);
+        }
+        else
+        {
+            // Player 2 : part du bord droit (x = dernière colonne)
+            launchPosition = new Point((GameConfig.GridColumns - 1) * GameConfig.GridSize, yPosition);
         }
 
-        // Marquer le missile comme lancé et passer au tour suivant
+        // Créer et lancer le missile avec animation
+        Missile missile = player.CreateMissile();
+        missile.Launch(launchPosition, power, direction);
+
+        // Démarrer le Timer pour l'animation
+        missileAnimationTimer.Start();
+
+        // Marquer le missile comme lancé et passer au tour suivant IMMÉDIATEMENT
         player.HasLaunchedMissileThisTurn = true;
         tour++;
         adversaire.ResetTurn();
@@ -741,6 +830,74 @@ partial class Window
                 break;
             }
         }
+    }
+
+    /// <summary>
+    /// Gère l'animation des missiles (appelé toutes les 100ms par le Timer)
+    /// </summary>
+    private void MissileAnimationTimer_Tick(object sender, EventArgs e)
+    {
+        bool anyMissileMoving = false;
+
+        // Vérifier tous les missiles des deux joueurs
+        foreach (var missile in player1.Missiles)
+        {
+            if (missile.State == MissileState.Flying)
+            {
+                bool finished = missile.Step();
+                if (!finished)
+                {
+                    anyMissileMoving = true;
+
+                    // Vérifier collision à la position actuelle
+                    Point currentPos = missile.GetCurrentPosition();
+                    List<Point> enemyPoints = player2.line.GetPlayerPoints();
+                    foreach (var enemyPoint in enemyPoints)
+                    {
+                        if (currentPos == enemyPoint)
+                        {
+                            missile.State = MissileState.Destroyed;
+                            RemoveEnemyPoint(enemyPoint, player2);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        foreach (var missile in player2.Missiles)
+        {
+            if (missile.State == MissileState.Flying)
+            {
+                bool finished = missile.Step();
+                if (!finished)
+                {
+                    anyMissileMoving = true;
+
+                    // Vérifier collision à la position actuelle
+                    Point currentPos = missile.GetCurrentPosition();
+                    List<Point> enemyPoints = player1.line.GetPlayerPoints();
+                    foreach (var enemyPoint in enemyPoints)
+                    {
+                        if (currentPos == enemyPoint)
+                        {
+                            missile.State = MissileState.Destroyed;
+                            RemoveEnemyPoint(enemyPoint, player1);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Si aucun missile ne bouge plus, arrêter le timer
+        if (!anyMissileMoving)
+        {
+            missileAnimationTimer.Stop();
+        }
+
+        _isDirty = true;
+        space.Invalidate();
     }
 
 }

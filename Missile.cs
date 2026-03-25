@@ -14,6 +14,8 @@ namespace point
         public int Power { get; set; }
         public MissileState State { get; set; }
         public Color OwnerColor { get; set; }
+        public int Direction { get; set; } // 1 = droite, -1 = gauche
+        public int CurrentStep { get; set; } // Pour l'animation
         private List<Point> Trajectory { get; set; }
         #endregion
 
@@ -22,31 +24,38 @@ namespace point
             OwnerColor = ownerColor;
             State = MissileState.Ready;
             Trajectory = new List<Point>();
+            CurrentStep = 0;
         }
 
         /// <summary>
-        /// Lance le missile depuis une ligne donnée avec une puissance (1-9)
-        /// Trajectoire toujours horizontale, de gauche à droite
+        /// Lance le missile depuis une ligne donnée avec une puissance (1-9) et une direction
+        /// direction = 1 (droite) ou -1 (gauche)
+        /// Formule distance : floor((puissance × max_colonnes) / 9)
         /// </summary>
-        public void Launch(Point from, int power)
+        public void Launch(Point from, int power, int direction)
         {
             Position = from;
             Power = power;
+            Direction = direction;
             Trajectory = new List<Point>();
+            CurrentStep = 0;
 
-            int maxWidth = GameConfig.GridColumns * GameConfig.GridSize;
+            // Nouvelle formule : distance_max = floor((puissance × max_colonnes) / 9)
+            int maxColumns = GameConfig.GridColumns;
+            int maxSteps = (int)Math.Floor((double)(power * maxColumns) / 9.0);
+
             Point currentPoint = from;
-
-            // Calcul du nombre de cases à parcourir
-            // Puissance 9 = jusqu'à la dernière colonne
-            int maxSteps = power;
 
             for (int i = 0; i < maxSteps; i++)
             {
-                Point nextPoint = new Point(currentPoint.X + GameConfig.GridSize, currentPoint.Y);
+                // Direction : 1 = droite (+), -1 = gauche (-)
+                Point nextPoint = new Point(
+                    currentPoint.X + (direction * GameConfig.GridSize),
+                    currentPoint.Y
+                );
 
-                // Vérifier que le point reste dans les limites horizontales
-                if (nextPoint.X >= maxWidth)
+                // Vérifier les limites
+                if (nextPoint.X < 0 || nextPoint.X >= maxColumns * GameConfig.GridSize)
                 {
                     break;
                 }
@@ -87,26 +96,36 @@ namespace point
         }
 
         /// <summary>
-        /// Dessine le missile sur le graphique
+        /// Dessine le missile sur le graphique (rectangle animé)
         /// </summary>
         public void paint(object sender, PaintEventArgs e)
         {
             if (State == MissileState.Flying && Trajectory.Count > 0)
             {
-                // Dessiner la ligne de trajectoire
-                using (Pen pen = new Pen(OwnerColor, 3))
+                // Dessiner uniquement le rectangle du missile à sa position actuelle
+                if (CurrentStep < Trajectory.Count)
                 {
-                    for (int i = 0; i < Trajectory.Count - 1; i++)
-                    {
-                        e.Graphics.DrawLine(pen, Trajectory[i], Trajectory[i + 1]);
-                    }
-                }
+                    Point missilePos = Trajectory[CurrentStep];
 
-                // Dessiner une flèche/cercle au bout de la trajectoire
-                Point impact = Trajectory[Trajectory.Count - 1];
-                using (Brush brush = new SolidBrush(OwnerColor))
-                {
-                    e.Graphics.FillEllipse(brush, impact.X - 4, impact.Y - 4, 8, 8);
+                    // Rectangle de taille GridSize/2 en largeur, GridSize/3 en hauteur
+                    int rectWidth = GameConfig.GridSize / 2;
+                    int rectHeight = GameConfig.GridSize / 3;
+
+                    // Centrer verticalement sur la ligne
+                    int rectX = missilePos.X - rectWidth / 2;
+                    int rectY = missilePos.Y - rectHeight / 2;
+
+                    // Dessiner le rectangle du missile
+                    using (Brush brush = new SolidBrush(OwnerColor))
+                    {
+                        e.Graphics.FillRectangle(brush, rectX, rectY, rectWidth, rectHeight);
+                    }
+
+                    // Bordure noire pour mieux voir le missile
+                    using (Pen pen = new Pen(Color.Black, 2))
+                    {
+                        e.Graphics.DrawRectangle(pen, rectX, rectY, rectWidth, rectHeight);
+                    }
                 }
             }
             else if (State == MissileState.Destroyed && Trajectory.Count > 0)
@@ -119,6 +138,32 @@ namespace point
                     e.Graphics.FillEllipse(brush, impact.X - 10, impact.Y - 10, 20, 20);
                 }
             }
+        }
+
+        /// <summary>
+        /// Avance le missile d'un pas dans sa trajectoire
+        /// Retourne true si le missile est arrivé au bout
+        /// </summary>
+        public bool Step()
+        {
+            if (State == MissileState.Flying && CurrentStep < Trajectory.Count - 1)
+            {
+                CurrentStep++;
+                return false;
+            }
+            return true; // Missile arrivé au bout
+        }
+
+        /// <summary>
+        /// Retourne la position actuelle du missile dans l'animation
+        /// </summary>
+        public Point GetCurrentPosition()
+        {
+            if (CurrentStep < Trajectory.Count)
+            {
+                return Trajectory[CurrentStep];
+            }
+            return Trajectory.Count > 0 ? Trajectory[Trajectory.Count - 1] : Point.Empty;
         }
     }
 }

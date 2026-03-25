@@ -71,36 +71,56 @@ Pour 500 points: ~250 000 opérations
 
 ---
 
-## 📋 Spécifications finales du missile
+## 📋 Spécifications finales du missile (v2 - Système animé)
 
 ### Fonctionnement actuel
-- **Puissance** : de 1 à 9 cases
-- **Trajectoire** : toujours **horizontale**, de gauche à droite
-- **Sélection** : le joueur choisit une **ligne** (row) où tirer
-- **Point de départ** : bord gauche de la grille (colonne 0) sur la ligne choisie
-- **Puissance 9** : le missile va jusqu'à la colonne la plus éloignée de la grille
-- **Fin de tour** : après le lancement, le tour passe **immédiatement** à l'adversaire
+- **Puissance** : de 1 à 9
+- **Distance max** : `floor((puissance × max_colonnes) / 9)` cases
+- **Trajectoire** : toujours **horizontale** :
+  - Joueur 1 (gauche) : missile va vers la droite →
+  - Joueur 2 (droite) : missile va vers la gauche ←
+- **Sélection de ligne** : clic direct sur la grille pour choisir la ligne de tir
+- **Calibration puissance** : jauge **verticale** (1-9)
+- **Lancement** : bouton "🚀 LANCER !" après calibrage
+- **Animation** : rectangle coloré qui se déplace case par case toutes les 100ms
+- **Collision** : détection en temps réel durant l'animation
+- **Fin de tour** : immédiate après le lancement (le missile continue d'animer)
+
+### Interface utilisateur
+- **Barre gauche (Joueur 1)** et **barre droite (Joueur 2)** :
+  - 🚀 Titre "Missile - [Nom]"
+  - 📍 Bouton "Choisir ligne sur grille" → passe en mode sélection
+  - Affichage de la ligne sélectionnée
+  - Jauge verticale de puissance (1-9)
+  - 🚀 Gros bouton rouge "LANCER !" pour tirer
 
 ### Fichiers modifiés
 
 #### ✅ `Missile.cs`
 - Enum `MissileState` : `Ready`, `Flying`, `Destroyed`
-- Propriétés : `Position`, `Power`, `State`, `OwnerColor`, `Trajectory` (plus de `Direction`)
-- Méthode `Launch(Point from, int power)` : lance le missile horizontalement (plus besoin du paramètre direction)
-- Méthode `CheckCollision(List<Point> enemyPoints)` : vérifie les collisions
-- Méthode `paint()` : dessine le missile et les explosions
+- Propriétés : `Position`, `Power`, `State`, `OwnerColor`, `Direction`, `CurrentStep`, `Trajectory`
+- Méthode `Launch(Point from, int power, int direction)` : lance le missile dans une direction (1 droite, -1 gauche)
+- Méthode `Step()` : avance d'un pas, retourne true si arrivé au bout
+- Méthode `GetCurrentPosition()` : position actuelle dans l'animation
+- Méthode `paint()` : dessine un **rectangle coloré** (GridSize/2 × GridSize/3) à la position actuelle
 
 #### ✅ `Player.cs`
 - `List<Missile> Missiles` : liste des missiles du joueur
 - `bool HasLaunchedMissileThisTurn` : flag pour limiter un missile par tour
-- `CreateMissile()` : crée un nouveau missile
+- `CreateMissile()` : crée un nouveau missile avec la couleur du joueur
 - `ResetTurn()` : réinitialise le flag missile
 
 #### ✅ `Window.Designer.cs`
-- `MissileBar()` : UI de lancement avec choix de ligne (1 à n) et puissance (1-9)
-- `LaunchMissile(Player, Player, int row, int power)` : gestion du lancement horizontal et des collisions
-- `RemoveEnemyPoint()` : supprime les points touchés
-- Intégration dans `Draw()` et `restart()`
+- `missileAnimationTimer` : Timer qui appelle `MissileAnimationTimer_Tick()` toutes les 100ms
+- `MissileBar()` : UI avec:
+  - Mode sélection de ligne par clic (stocke référence au label)
+  - Jauge verticale pour puissance
+  - Bouton de lancement
+- `LaunchMissileWithAnimation()` : lance le missile avec direction selon le joueur, démarre le timer
+- `MissileAnimationTimer_Tick()` : gère l'animation et les collisions en temps réel
+- `space_MouseClick()` : détecte mode sélection de ligne et met en œuvre directement via la référence stockée
+- `Draw()` : appelle `missile.paint()` pour tous les missiles actifs
+- `restart()` : nettoie tous les missiles
 
 #### ✅ `Line.cs`
 - `GetPlayerPoints()` : expose les points du joueur pour la détection de collision
