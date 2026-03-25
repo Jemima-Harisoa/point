@@ -78,33 +78,28 @@ public class Save
 
     /// <summary>
     /// Ajoute tous les missiles de deux joueurs à la sauvegarde
+    /// Sauvegarde TOUS les missiles (en vol et détruits) pour conserver l'état complet
     /// </summary>
     public void AddMissilesFromPlayers(Player player1, Player player2)
     {
-        // Missiles du joueur 1
+        // Missiles du joueur 1 - TOUS les missiles
         foreach (var missile in player1.Missiles)
         {
-            if (missile.State == MissileState.Destroyed)
-            {
-                Point impact = missile.GetCurrentPosition();
-                AddMissile(missile.Position.X, missile.Position.Y,
-                          impact.X, impact.Y,
-                          missile.Power, missile.Direction,
-                          missile.HitTarget, player1.Order);
-            }
+            Point impact = missile.GetCurrentPosition();
+            AddMissile(missile.Position.X, missile.Position.Y,
+                      impact.X, impact.Y,
+                      missile.Power, missile.Direction,
+                      missile.HitTarget, player1.Order);
         }
 
-        // Missiles du joueur 2
+        // Missiles du joueur 2 - TOUS les missiles
         foreach (var missile in player2.Missiles)
         {
-            if (missile.State == MissileState.Destroyed)
-            {
-                Point impact = missile.GetCurrentPosition();
-                AddMissile(missile.Position.X, missile.Position.Y,
-                          impact.X, impact.Y,
-                          missile.Power, missile.Direction,
-                          missile.HitTarget, player2.Order);
-            }
+            Point impact = missile.GetCurrentPosition();
+            AddMissile(missile.Position.X, missile.Position.Y,
+                      impact.X, impact.Y,
+                      missile.Power, missile.Direction,
+                      missile.HitTarget, player2.Order);
         }
     }
 

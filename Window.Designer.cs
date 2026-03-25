@@ -438,11 +438,17 @@ partial class Window
         SaveButton.Location = new System.Drawing.Point( ((start().Width + 250 ) - SaveButton.Width) / 2 , 10);
         SaveButton.Anchor = AnchorStyles.Top;
         SaveButton.MouseClick += (sender, e ) => {
+            // DEBUG: Log des missiles avant sauvegarde
+            MissileDebug.LogMissilesBeforeSave(player1, player2);
+
             Save sauvegarde = new Save(clickedPoints);
             // Ajouter les missiles à la sauvegarde
             sauvegarde.AddMissilesFromPlayers(player1, player2);
             sauvegarde.Write(player1.nom, player2.nom);
             game = true;
+
+            MessageBox.Show($"Partie sauvegardée !\nPoints: {clickedPoints.Count}\nMissiles J1: {player1.Missiles.Count}\nMissiles J2: {player2.Missiles.Count}",
+                           "Sauvegarde", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
        return SaveButton;
     }
@@ -474,6 +480,9 @@ partial class Window
             player1.Missiles.Clear();
             player2.Missiles.Clear();
 
+            int missiles1Count = 0;
+            int missiles2Count = 0;
+
             foreach (var savedMissile in savedMissiles)
             {
                 // Déterminer le propriétaire du missile
@@ -491,12 +500,23 @@ partial class Window
 
                 // Ajouter le missile à la liste du bon joueur
                 owner.Missiles.Add(missile);
+
+                if (owner == player1)
+                    missiles1Count++;
+                else
+                    missiles2Count++;
             }
+
+            // DEBUG: Log des missiles après chargement
+            MissileDebug.LogMissilesAfterLoad(player1, player2, savedMissiles);
 
             SyncLineClickedPoints();
             game = true;
             _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate(); // Déclencher le redessin du panneau
+
+            MessageBox.Show($"Partie chargée !\nPoints: {clickedPoints.Count}\nMissiles chargés: {savedMissiles.Count}\n  - J1: {missiles1Count}\n  - J2: {missiles2Count}",
+                           "Chargement", MessageBoxButtons.OK, MessageBoxIcon.Information);
         };
        return LoadButton;
     }
