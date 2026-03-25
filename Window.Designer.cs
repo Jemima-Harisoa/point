@@ -30,6 +30,85 @@ partial class Window
     private Label player2LineLabel = null; // Label de ligne pour joueur 2
     private int selectedMissilePower = 3; // Puissance calibrée par le joueur
     private int missilesThrownCount = 0; // Compteur de missiles lancés (pour le calcul du tour) 
+    private const int NotchWidth = 20;
+
+    private void UpdateGridMetrics()
+    {
+        if (space == null || space.Width <= 0 || space.Height <= 0)
+        {
+            return;
+        }
+
+        int playableWidth = Math.Max(1, space.Width - (NotchWidth * 2));
+        int playableHeight = Math.Max(1, space.Height);
+        GameConfig.UpdateGridSize(playableWidth, playableHeight);
+    }
+
+    private int GetGridStartX()
+    {
+        int playableWidth = Math.Max(1, space.Width - (NotchWidth * 2));
+        int gridWidth = Math.Max(0, (GameConfig.GridColumns - 1) * GameConfig.GridSize);
+        int freeWidth = Math.Max(0, playableWidth - gridWidth);
+        return NotchWidth + (freeWidth / 2);
+    }
+
+    private int GetGridStartY()
+    {
+        int gridHeight = Math.Max(0, (GameConfig.GridRows - 1) * GameConfig.GridSize);
+        int freeHeight = Math.Max(0, space.Height - gridHeight);
+        return freeHeight / 2;
+    }
+
+    private bool TryGetGridRow(int y, out int row)
+    {
+        int localY = y - GetGridStartY();
+        row = (int)Math.Round(localY / (double)Math.Max(1, GameConfig.GridSize)) + 1;
+        return row >= 1 && row <= GameConfig.GridRows;
+    }
+
+    private bool TrySnapToGrid(Point click, out Point snapped)
+    {
+        int gridSize = Math.Max(1, GameConfig.GridSize);
+        int tolerance = GameConfig.ClickTolerance;
+        int startX = GetGridStartX();
+        int startY = GetGridStartY();
+
+        int nearestCol = (int)Math.Round((click.X - startX) / (double)gridSize);
+        int nearestRow = (int)Math.Round((click.Y - startY) / (double)gridSize);
+
+        if (nearestCol < 0 || nearestCol >= GameConfig.GridColumns || nearestRow < 0 || nearestRow >= GameConfig.GridRows)
+        {
+            snapped = Point.Empty;
+            return false;
+        }
+
+        int nearestX = startX + (nearestCol * gridSize);
+        int nearestY = startY + (nearestRow * gridSize);
+
+        if (Math.Abs(click.X - nearestX) <= tolerance && Math.Abs(click.Y - nearestY) <= tolerance)
+        {
+            snapped = new Point(nearestX, nearestY);
+            return true;
+        }
+
+        snapped = Point.Empty;
+        return false;
+    }
+
+    private void GetNotchBounds(out Rectangle leftNotch, out Rectangle rightNotch)
+    {
+        int startX = GetGridStartX();
+        int startY = GetGridStartY();
+        int gridHeight = Math.Max(1, (GameConfig.GridRows - 1) * GameConfig.GridSize);
+        int gridWidth = Math.Max(0, (GameConfig.GridColumns - 1) * GameConfig.GridSize);
+
+        int leftX = Math.Max(0, startX - NotchWidth);
+        int rightX = Math.Min(Math.Max(0, space.Width - NotchWidth), startX + gridWidth);
+
+        leftNotch = new Rectangle(leftX, Math.Max(0, startY - (GameConfig.GridSize / 2)), NotchWidth, Math.Min(space.Height, gridHeight + GameConfig.GridSize));
+        rightNotch = new Rectangle(rightX, Math.Max(0, startY - (GameConfig.GridSize / 2)), NotchWidth, Math.Min(space.Height, gridHeight + GameConfig.GridSize));
+    }
+
     protected override void Dispose(bool disposing)
     {
         if (disposing && (components != null))
@@ -100,7 +179,7 @@ partial class Window
         this.Resize += (sender, e) => {
             if(space != null && space.Width > 0 && space.Height > 0)
             {
-                GameConfig.UpdateGridSize(space.Width, space.Height);
+                UpdateGridMetrics();
                 space.Invalidate(); // Redessiner le panneau avec la nouvelle taille
             }
         };
@@ -441,14 +520,20 @@ partial class Window
     /// </summary>
     private void space_MouseClick(object sender, MouseEventArgs e)
     {
+        UpdateGridMetrics();
+
+        int gridStartX = GetGridStartX();
+        int gridStartY = GetGridStartY();
+        int gridWidth = Math.Max(0, (GameConfig.GridColumns - 1) * GameConfig.GridSize);
+        int gridHeight = Math.Max(0, (GameConfig.GridRows - 1) * GameConfig.GridSize);
+        Rectangle gridBounds = new Rectangle(gridStartX, gridStartY, gridWidth, gridHeight);
+
+        GetNotchBounds(out Rectangle leftNotchBounds, out Rectangle rightNotchBounds);
+
         // Mode sélection de ligne pour missile (via bouton "Choisir ligne")
         if (isSelectingMissileLine && missileLaunchingPlayer != null && currentMissileLineLabel != null)
         {
-            // Calculer la ligne cliquée (1-indexed)
-            int clickedRow = (int)Math.Round(e.Y / (double)GameConfig.GridSize);
-
-            // Vérifier que la ligne est valide
-            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            if (TryGetGridRow(e.Y, out int clickedRow))
             {
                 // Mettre à jour directement le label via la référence stockée
                 currentMissileLineLabel.Text = clickedRow.ToString();
@@ -467,14 +552,12 @@ partial class Window
         }
 
         // === DÉTECTION DES CLICS SUR LES ENCOCHES ===
-        int notchWidth = 20; // Même taille que dans paint()
-        int gridSize = GameConfig.GridSize;
+        int gridSize = Math.Max(1, GameConfig.GridSize);
 
         // Encoche GAUCHE (Joueur 1) - utilise la référence directe
-        if (e.X <= notchWidth && game && hasStarted)
+        if (leftNotchBounds.Contains(e.Location) && game && hasStarted)
         {
-            int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
-            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            if (TryGetGridRow(e.Y, out int clickedRow))
             {
                 // Mettre à jour directement le label du joueur 1
                 if (player1LineLabel != null)
@@ -486,10 +569,9 @@ partial class Window
         }
 
         // Encoche DROITE (Joueur 2) - utilise la référence directe
-        if (e.X >= space.Width - notchWidth && game && hasStarted)
+        if (rightNotchBounds.Contains(e.Location) && game && hasStarted)
         {
-            int clickedRow = (int)Math.Round(e.Y / (double)gridSize);
-            if (clickedRow >= 1 && clickedRow <= GameConfig.GridRows)
+            if (TryGetGridRow(e.Y, out int clickedRow))
             {
                 // Mettre à jour directement le label du joueur 2
                 if (player2LineLabel != null)
@@ -510,23 +592,14 @@ partial class Window
             if (currentPlayer.HasLaunchedMissileThisTurn) return;
 
             // Ignorer les clics dans les zones d'encoches (pour éviter de placer des points)
-            if (e.X <= notchWidth || e.X >= space.Width - notchWidth) return;
+            if (leftNotchBounds.Contains(e.Location) || rightNotchBounds.Contains(e.Location)) return;
 
-            // Utiliser les paramètres de GameConfig pour flexibilité
-            int tolerance = GameConfig.ClickTolerance;
+            if (!gridBounds.Contains(e.Location)) return;
 
-            // Trouver l'intersection la plus proche
-            int nearestX = (int)Math.Round(e.X / (double)gridSize) * gridSize;
-            int nearestY = (int)Math.Round(e.Y / (double)gridSize) * gridSize;
-
-            // Vérifier si le clic est suffisamment proche de cette intersection
-            if (Math.Abs(e.X - nearestX) <= tolerance && Math.Abs(e.Y - nearestY) <= tolerance)
+            if (TrySnapToGrid(e.Location, out Point p))
             {
-                Point p = new Point(nearestX, nearestY);
-
                 // Vérifier que le point est dans les limites valides de la grille
-                if(nearestX > 0 && nearestX < space.Width && nearestY > 0 && nearestY < space.Height
-                    && !clickedPoints.Contains(p))
+                if(!clickedPoints.Contains(p))
                 {
                     // Calculer quel joueur devrait jouer selon le nombre de coups + missiles
                     int expectedType = totalActions % 2;
@@ -592,31 +665,32 @@ partial class Window
 
         // Recalculer la taille de la grille selon les vraies dimensions du panneau
         // (Important: la taille du panneau peut être différente des dimensions par défaut)
-        if(space.Width > 0 && space.Height > 0)
-        {
-            GameConfig.UpdateGridSize(space.Width, space.Height);
-        }
+        UpdateGridMetrics();
 
         // Utiliser la taille de grille paramétrable
         int gridSize = GameConfig.GridSize;
         Pen BlackPen = new Pen(Color.Black, 2);
+        int startX = GetGridStartX();
+        int startY = GetGridStartY();
+        int gridWidth = Math.Max(0, (GameConfig.GridColumns - 1) * gridSize);
+        int gridHeight = Math.Max(0, (GameConfig.GridRows - 1) * gridSize);
+        int endX = startX + gridWidth;
+        int endY = startY + gridHeight;
 
-        // Zone d'encoches sur les côtés
-        int notchWidth = 20;
+        // Zone d'encoches sur les côtés, alignées sur la grille centrée
+        int leftNotchX = Math.Max(0, startX - NotchWidth);
+        int rightNotchX = Math.Min(Math.Max(0, space.Width - NotchWidth), endX);
 
         // Tracer les lignes verticales (de la zone de jeu, entre les encoches)
-        for(int col = 1; col <= GameConfig.GridColumns; col++){
-            int x = notchWidth + (col - 1) * gridSize;
-            if (x < space.Width - notchWidth)
-            {
-                graph.DrawLine(BlackPen, x, 0, x, space.Height);
-            }
+        for(int col = 0; col < GameConfig.GridColumns; col++){
+            int x = startX + (col * gridSize);
+            graph.DrawLine(BlackPen, x, startY, x, endY);
         }
 
         // Tracer les lignes horizontales
-        for(int row = 1; row <= GameConfig.GridRows; row++){
-            int y = row * gridSize;
-            graph.DrawLine(BlackPen, notchWidth, y, space.Width - notchWidth, y);
+        for(int row = 0; row < GameConfig.GridRows; row++){
+            int y = startY + (row * gridSize);
+            graph.DrawLine(BlackPen, startX, y, endX, y);
         }
 
         // === NUMÉROS DE LIGNES ET COLONNES ===
@@ -625,17 +699,17 @@ partial class Window
         // Numéros de lignes (sur les encoches gauches)
         for (int row = 1; row <= GameConfig.GridRows; row++)
         {
-            int yPos = row * gridSize;
+            int yPos = startY + ((row - 1) * gridSize);
             string rowNum = row.ToString();
             SizeF textSize = graph.MeasureString(rowNum, numberFont);
 
             // Numéro sur encoche gauche (rouge)
             graph.DrawString(rowNum, numberFont, Brushes.DarkRed,
-                notchWidth / 2 - textSize.Width / 2, yPos - textSize.Height / 2);
+                leftNotchX + (NotchWidth / 2f) - (textSize.Width / 2f), yPos - textSize.Height / 2);
 
             // Numéro sur encoche droite (bleu)
             graph.DrawString(rowNum, numberFont, Brushes.DarkBlue,
-                space.Width - notchWidth / 2 - textSize.Width / 2, yPos - textSize.Height / 2);
+                rightNotchX + (NotchWidth / 2f) - (textSize.Width / 2f), yPos - textSize.Height / 2);
         }
 
         // === ENCOCHES DE SÉLECTION DE LIGNE POUR MISSILES ===
@@ -643,26 +717,26 @@ partial class Window
 
         for (int row = 1; row <= GameConfig.GridRows; row++)
         {
-            int yPos = row * gridSize;
+            int yPos = startY + ((row - 1) * gridSize);
 
             // Encoche GAUCHE (Joueur 1 - Rouge)
             using (Brush redBrush = new SolidBrush(Color.FromArgb(150, 255, 150, 150)))
             {
-                graph.FillRectangle(redBrush, 0, yPos - notchHeight / 2, notchWidth, notchHeight);
+                graph.FillRectangle(redBrush, leftNotchX, yPos - notchHeight / 2, NotchWidth, notchHeight);
             }
             using (Pen redPen = new Pen(Color.DarkRed, 1))
             {
-                graph.DrawRectangle(redPen, 0, yPos - notchHeight / 2, notchWidth, notchHeight);
+                graph.DrawRectangle(redPen, leftNotchX, yPos - notchHeight / 2, NotchWidth, notchHeight);
             }
 
             // Encoche DROITE (Joueur 2 - Bleu)
             using (Brush blueBrush = new SolidBrush(Color.FromArgb(150, 150, 150, 255)))
             {
-                graph.FillRectangle(blueBrush, space.Width - notchWidth, yPos - notchHeight / 2, notchWidth, notchHeight);
+                graph.FillRectangle(blueBrush, rightNotchX, yPos - notchHeight / 2, NotchWidth, notchHeight);
             }
             using (Pen bluePen = new Pen(Color.DarkBlue, 1))
             {
-                graph.DrawRectangle(bluePen, space.Width - notchWidth, yPos - notchHeight / 2, notchWidth, notchHeight);
+                graph.DrawRectangle(bluePen, rightNotchX, yPos - notchHeight / 2, NotchWidth, notchHeight);
             }
         }
 
@@ -864,6 +938,8 @@ partial class Window
     /// </summary>
     private void LaunchMissileWithAnimation(Player player, Player adversaire, int row, int power)
     {
+        UpdateGridMetrics();
+
         // Vérifier si c'est le tour du joueur (inclut les missiles lancés)
         int totalActions = clickedPoints.Count + missilesThrownCount;
         Player currentPlayer = (totalActions % 2 == 0) ? player1 : player2;
@@ -893,18 +969,20 @@ partial class Window
 
         // Calculer la position de départ selon le joueur et la ligne
         // row commence à 1 dans l'UI, donc on soustrait 1 pour avoir l'index de grille
-        int yPosition = (row - 1) * GameConfig.GridSize;
+        int startX = GetGridStartX();
+        int startY = GetGridStartY();
+        int yPosition = startY + ((row - 1) * GameConfig.GridSize);
         Point launchPosition;
 
         if (player == player1)
         {
-            // Player 1 : part du bord gauche (x = 0)
-            launchPosition = new Point(0, yPosition);
+            // Player 1 : part de la première colonne de la grille
+            launchPosition = new Point(startX, yPosition);
         }
         else
         {
-            // Player 2 : part du bord droit (x = dernière colonne)
-            launchPosition = new Point((GameConfig.GridColumns - 1) * GameConfig.GridSize, yPosition);
+            // Player 2 : part de la dernière colonne de la grille
+            launchPosition = new Point(startX + ((GameConfig.GridColumns - 1) * GameConfig.GridSize), yPosition);
         }
 
         // Créer et lancer le missile avec animation

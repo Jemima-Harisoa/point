@@ -44,6 +44,18 @@ namespace point
             int maxColumns = GameConfig.GridColumns;
             int maxSteps = (int)Math.Floor((double)(power * maxColumns) / 9.0);
 
+            // Limites horizontales réelles de la grille (peut être centrée avec offset)
+            int minX = from.X;
+            int maxX = from.X;
+            if (direction > 0)
+            {
+                maxX = from.X + ((maxColumns - 1) * GameConfig.GridSize);
+            }
+            else
+            {
+                minX = from.X - ((maxColumns - 1) * GameConfig.GridSize);
+            }
+
             Point currentPoint = from;
 
             for (int i = 0; i < maxSteps; i++)
@@ -55,7 +67,7 @@ namespace point
                 );
 
                 // Vérifier les limites
-                if (nextPoint.X < 0 || nextPoint.X >= maxColumns * GameConfig.GridSize)
+                if (nextPoint.X < minX || nextPoint.X > maxX)
                 {
                     break;
                 }
