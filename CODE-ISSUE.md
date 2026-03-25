@@ -59,15 +59,65 @@ Pour 500 points: ~250 000 opérations
 
 # TODO — Feature Missile
 
+## ✅ Statut global - TERMINÉ
+
+| Tâche | Statut |
+|---|---|
+| Input colonnes/lignes dans ShowStartForm | ✅ Fait |
+| Classe `Missile` | ✅ Fait |
+| Intégration dans le tour de jeu | ✅ Fait |
+| UI barre de lancement (`MissileBar`) | ✅ Fait |
+| Gestion des collisions et destruction | ✅ Fait |
+
+---
+
+## 📋 Spécifications finales du missile
+
+### Fonctionnement actuel
+- **Puissance** : de 1 à 9 cases
+- **Trajectoire** : toujours **horizontale**, de gauche à droite
+- **Sélection** : le joueur choisit une **ligne** (row) où tirer
+- **Point de départ** : bord gauche de la grille (colonne 0) sur la ligne choisie
+- **Puissance 9** : le missile va jusqu'à la colonne la plus éloignée de la grille
+- **Fin de tour** : après le lancement, le tour passe **immédiatement** à l'adversaire
+
+### Fichiers modifiés
+
+#### ✅ `Missile.cs`
+- Enum `MissileState` : `Ready`, `Flying`, `Destroyed`
+- Propriétés : `Position`, `Power`, `State`, `OwnerColor`, `Trajectory` (plus de `Direction`)
+- Méthode `Launch(Point from, int power)` : lance le missile horizontalement (plus besoin du paramètre direction)
+- Méthode `CheckCollision(List<Point> enemyPoints)` : vérifie les collisions
+- Méthode `paint()` : dessine le missile et les explosions
+
+#### ✅ `Player.cs`
+- `List<Missile> Missiles` : liste des missiles du joueur
+- `bool HasLaunchedMissileThisTurn` : flag pour limiter un missile par tour
+- `CreateMissile()` : crée un nouveau missile
+- `ResetTurn()` : réinitialise le flag missile
+
+#### ✅ `Window.Designer.cs`
+- `MissileBar()` : UI de lancement avec choix de ligne (1 à n) et puissance (1-9)
+- `LaunchMissile(Player, Player, int row, int power)` : gestion du lancement horizontal et des collisions
+- `RemoveEnemyPoint()` : supprime les points touchés
+- Intégration dans `Draw()` et `restart()`
+
+#### ✅ `Line.cs`
+- `GetPlayerPoints()` : expose les points du joueur pour la détection de collision
+
+---
+
+## 📝 Documentation originale (archive)
+
 ## Statut global
 
 | Tâche | Statut |
 |---|---|
 | Input colonnes/lignes dans ShowStartForm | ✅ Fait |
-| Classe `Missile` | ⬜ À faire |
-| Intégration dans le tour de jeu | ⬜ À faire |
-| UI barre de lancement (`MissileBar`) | ⬜ À faire |
-| Gestion des collisions et destruction | ⬜ À faire |
+| Classe `Missile` | ✅ Fait |
+| Intégration dans le tour de jeu | ✅ Fait |
+| UI barre de lancement (`MissileBar`) | ✅ Fait |
+| Gestion des collisions et destruction | ✅ Fait |
 
 ---
 

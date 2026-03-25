@@ -13,7 +13,6 @@ namespace point
         public Point Position { get; set; }
         public int Power { get; set; }
         public MissileState State { get; set; }
-        public int Direction { get; set; }
         public Color OwnerColor { get; set; }
         private List<Point> Trajectory { get; set; }
         #endregion
@@ -26,25 +25,28 @@ namespace point
         }
 
         /// <summary>
-        /// Lance le missile depuis une position donnée avec une direction et une puissance
+        /// Lance le missile depuis une ligne donnée avec une puissance (1-9)
+        /// Trajectoire toujours horizontale, de gauche à droite
         /// </summary>
-        public void Launch(Point from, int direction, int power)
+        public void Launch(Point from, int power)
         {
             Position = from;
-            Direction = direction;
             Power = power;
             Trajectory = new List<Point>();
 
+            int maxWidth = GameConfig.GridColumns * GameConfig.GridSize;
             Point currentPoint = from;
-            for (int i = 0; i < power; i++)
-            {
-                Point nextPoint = Step(direction, currentPoint, GameConfig.GridSize);
 
-                // Vérifier que le point reste dans les limites
-                int maxWidth = GameConfig.GridColumns * GameConfig.GridSize;
-                int maxHeight = GameConfig.GridRows * GameConfig.GridSize;
-                if (nextPoint.X < 0 || nextPoint.X >= maxWidth ||
-                    nextPoint.Y < 0 || nextPoint.Y >= maxHeight)
+            // Calcul du nombre de cases à parcourir
+            // Puissance 9 = jusqu'à la dernière colonne
+            int maxSteps = power;
+
+            for (int i = 0; i < maxSteps; i++)
+            {
+                Point nextPoint = new Point(currentPoint.X + GameConfig.GridSize, currentPoint.Y);
+
+                // Vérifier que le point reste dans les limites horizontales
+                if (nextPoint.X >= maxWidth)
                 {
                     break;
                 }
@@ -56,26 +58,6 @@ namespace point
             State = MissileState.Flying;
         }
 
-        /// <summary>
-        /// Calcule le prochain point selon la direction
-        /// Basé sur Line.Equation() : 1=vertical, 2=horizontal, 3=diagonale croissante, 4=diagonale décroissante
-        /// </summary>
-        private static Point Step(int direction, Point p, int gridSize)
-        {
-            switch (direction)
-            {
-                case 1: // Vertical (vers le haut)
-                    return new Point(p.X, p.Y - gridSize);
-                case 2: // Horizontal (vers la droite)
-                    return new Point(p.X + gridSize, p.Y);
-                case 3: // Diagonale croissante (↗)
-                    return new Point(p.X + gridSize, p.Y - gridSize);
-                case 4: // Diagonale décroissante (↘)
-                    return new Point(p.X + gridSize, p.Y + gridSize);
-                default:
-                    return p;
-            }
-        }
 
         /// <summary>
         /// Retourne une copie de la trajectoire

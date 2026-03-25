@@ -618,59 +618,52 @@ partial class Window
 
         // Ligne de départ
         Label lineLabel = new Label();
-        lineLabel.Text = "Colonne départ (1-" + GameConfig.GridColumns + "):";
+        lineLabel.Text = "Ligne de tir (1-" + GameConfig.GridRows + "):";
         lineLabel.AutoSize = true;
         layout.Controls.Add(lineLabel);
 
-        NumericUpDown columnInput = new NumericUpDown();
-        columnInput.Name = "columnInput";
-        columnInput.Minimum = 1;
-        columnInput.Maximum = GameConfig.GridColumns - 1;
-        columnInput.Value = GameConfig.GridColumns / 2;
-        columnInput.Width = 180;
-        layout.Controls.Add(columnInput);
+        NumericUpDown rowInput = new NumericUpDown();
+        rowInput.Name = "rowInput";
+        rowInput.Minimum = 1;
+        rowInput.Maximum = GameConfig.GridRows;
+        rowInput.Value = GameConfig.GridRows / 2;
+        rowInput.Width = 180;
+        layout.Controls.Add(rowInput);
 
         // Puissance
         Label powerLabel = new Label();
-        powerLabel.Text = "Puissance (1-5):";
+        powerLabel.Text = "Puissance (1-9):";
         powerLabel.AutoSize = true;
         layout.Controls.Add(powerLabel);
+
+        Label powerInfo = new Label();
+        powerInfo.Text = "(9 = jusqu'au bout de la grille)";
+        powerInfo.AutoSize = true;
+        powerInfo.Font = new Font(powerInfo.Font.FontFamily, 8, FontStyle.Italic);
+        layout.Controls.Add(powerInfo);
 
         TrackBar powerSlider = new TrackBar();
         powerSlider.Name = "powerSlider";
         powerSlider.Minimum = 1;
-        powerSlider.Maximum = 5;
-        powerSlider.Value = 3;
+        powerSlider.Maximum = 9;
+        powerSlider.Value = 5;
         powerSlider.Width = 180;
         layout.Controls.Add(powerSlider);
 
         Label powerValue = new Label();
-        powerValue.Text = "3";
+        powerValue.Text = "5";
         powerValue.AutoSize = true;
         layout.Controls.Add(powerValue);
 
         // Mise à jour du label de puissance
         powerSlider.ValueChanged += (s, e) => powerValue.Text = powerSlider.Value.ToString();
 
-        // Direction
-        Label directionLabel = new Label();
-        directionLabel.Text = "Direction:";
-        directionLabel.AutoSize = true;
-        layout.Controls.Add(directionLabel);
-
-        ComboBox directionCombo = new ComboBox();
-        directionCombo.Name = "directionCombo";
-        directionCombo.Items.AddRange(new string[] { "Vertical", "Horizontal", "Diagonale ↗", "Diagonale ↘" });
-        directionCombo.SelectedIndex = 1;
-        directionCombo.Width = 180;
-        layout.Controls.Add(directionCombo);
-
         // Bouton de lancement
         Button launchButton = new Button();
         launchButton.Text = "🚀 Lancer !";
         launchButton.Width = 180;
         launchButton.Height = 40;
-        launchButton.Click += (s, e) => LaunchMissile(player, adversaire, (int)columnInput.Value, powerSlider.Value, directionCombo.SelectedIndex + 1);
+        launchButton.Click += (s, e) => LaunchMissile(player, adversaire, (int)rowInput.Value, powerSlider.Value);
         layout.Controls.Add(launchButton);
 
         missilePanel.Controls.Add(layout);
@@ -679,8 +672,9 @@ partial class Window
 
     /// <summary>
     /// Gère le lancement d'un missile
+    /// Le missile part toujours du bord gauche (colonne 0) et va horizontalement vers la droite
     /// </summary>
-    private void LaunchMissile(Player player, Player adversaire, int column, int power, int direction)
+    private void LaunchMissile(Player player, Player adversaire, int row, int power)
     {
         // Vérifier si c'est le tour du joueur
         Player currentPlayer = (clickedPoints.Count % 2 == 0) ? player1 : player2;
@@ -703,19 +697,13 @@ partial class Window
             return;
         }
 
-        // Calculer la position de départ selon la direction
-        Point launchPosition = direction switch
-        {
-            1 => new Point(column * GameConfig.GridSize, 0), // Vertical
-            2 => new Point(0, column * GameConfig.GridSize), // Horizontal
-            3 => new Point(0, 0), // Diagonale ↗
-            4 => new Point(0, GameConfig.GridRows * GameConfig.GridSize - GameConfig.GridSize), // Diagonale ↘
-            _ => new Point(0, 0)
-        };
+        // Calculer la position de départ : bord gauche (x=0) sur la ligne choisie
+        // row commence à 1 dans l'UI, donc on soustrait 1 pour avoir l'index de grille
+        Point launchPosition = new Point(0, (row - 1) * GameConfig.GridSize);
 
-        // Créer et lancer le missile
+        // Créer et lancer le missile (toujours horizontal)
         Missile missile = player.CreateMissile();
-        missile.Launch(launchPosition, direction, power);
+        missile.Launch(launchPosition, power);
 
         // Vérifier les collisions
         List<Point> enemyPoints = adversaire.line.GetPlayerPoints();
