@@ -9,6 +9,8 @@ partial class Window
     private static Label label1 ;
     private static Label label2 ;
     private List<Point> clickedPoints = new List<Point>();
+    private List<int> pointOwners = new List<int>(); // 0 = joueur1, 1 = joueur2
+    private List<int> actionHistory = new List<int>(); // 0 = point, 1 = missile
 
     private int tour = 0;
     private int maxPoint = 0 ;
@@ -107,6 +109,36 @@ partial class Window
 
         leftNotch = new Rectangle(leftX, Math.Max(0, startY - (GameConfig.GridSize / 2)), NotchWidth, Math.Min(space.Height, gridHeight + GameConfig.GridSize));
         rightNotch = new Rectangle(rightX, Math.Max(0, startY - (GameConfig.GridSize / 2)), NotchWidth, Math.Min(space.Height, gridHeight + GameConfig.GridSize));
+    }
+
+    private int CurrentPlayerByActionHistory()
+    {
+        return actionHistory.Count % 2;
+    }
+
+    private void SyncLineClickedPoints()
+    {
+        List<Point> linePoints = new List<Point>();
+        int pointIndex = 0;
+
+        foreach (int action in actionHistory)
+        {
+            if (action == 0)
+            {
+                if (pointIndex < clickedPoints.Count)
+                {
+                    linePoints.Add(clickedPoints[pointIndex]);
+                    pointIndex++;
+                }
+            }
+            else
+            {
+                // Placeholder missile pour conserver la parité des joueurs
+                linePoints.Add(new Point(-1, -1));
+            }
+        }
+
+        Line.ClickedPoints = linePoints;
     }
 
     protected override void Dispose(bool disposing)
@@ -255,6 +287,8 @@ partial class Window
             tour = 0;
             game = true;
             clickedPoints.Clear();
+            pointOwners.Clear();
+            actionHistory.Clear();
             Line.ClickedPoints.Clear();
             player1.Missiles.Clear();
             player2.Missiles.Clear();
@@ -425,7 +459,14 @@ partial class Window
         LoadButton.MouseClick += (sender, e ) => {
             Save sauvegarde = new Save();
             clickedPoints = sauvegarde.getPointList();
-            Line.ClickedPoints = clickedPoints ;
+            pointOwners = new List<int>();
+            actionHistory = new List<int>();
+            for (int i = 0; i < clickedPoints.Count; i++)
+            {
+                pointOwners.Add(i % 2);
+                actionHistory.Add(0);
+            }
+            SyncLineClickedPoints();
             game = true;
             _isDirty = true; // Marquer qu'on doit redessiner
             space.Invalidate(); // Déclencher le redessin du panneau
@@ -584,9 +625,6 @@ partial class Window
 
         if (game && hasStarted)
         {
-            // Calculer le joueur actuel en incluant les missiles lancés
-            int totalActions = clickedPoints.Count + missilesThrownCount;
-
             // Ignorer les clics dans les zones d'encoches (pour éviter de placer des points)
             if (leftNotchBounds.Contains(e.Location) || rightNotchBounds.Contains(e.Location)) return;
 
@@ -597,12 +635,6 @@ partial class Window
                 // Vérifier que le point est dans les limites valides de la grille
                 if(!clickedPoints.Contains(p))
                 {
-                    // Calculer quel joueur devrait jouer selon le nombre de coups + missiles
-                    int expectedType = totalActions % 2;
-                    if(inversed) expectedType = (expectedType + 1) % 2;
-
-                    // Pour un contrôle strict: rejeter silencieusement les clics hors tour
-                    // Les joueurs doivent respecter l'alternance manuellement
                     add(p);
                 }
             }
@@ -626,8 +658,17 @@ partial class Window
             for (int i = 1; i < clickedPoints.Count ; i++)
             {
                 clickedPoints[i - 1] = clickedPoints[i]; 
+                if (i < pointOwners.Count)
+                {
+                    pointOwners[i - 1] = pointOwners[i];
+                }
             }
             clickedPoints.Remove(clickedPoints.Last() );
+            if (pointOwners.Count > 0)
+            {
+                pointOwners.RemoveAt(pointOwners.Count - 1);
+            }
+            SyncLineClickedPoints();
         }        
     }
     
@@ -638,9 +679,12 @@ partial class Window
     /// </summary>
     /// <param name="p">Le point (coordinate) à ajouter à la partie</param>
     private void add(Point p){
+        int owner = CurrentPlayerByActionHistory();
         tour++;
         clickedPoints.Add(p);
-        Line.ClickedPoints = clickedPoints; // Mettre à jour immédiatement pour éviter le retard et invalider les caches
+        pointOwners.Add(owner);
+        actionHistory.Add(0);
+        SyncLineClickedPoints();
         _isDirty = true; // Marquer qu'on doit redessiner
         space.Invalidate(); // Déclencher le redessin du panneau
     } 
@@ -738,28 +782,34 @@ partial class Window
 
         // Dessiner les points colorés aux emplacements cliqués
         if (maxPoint != 0) CheckPoint();
-        int k = !inversed ? 0 : 1;
-
-        foreach (var point in clickedPoints)
+        for (int i = 0; i < clickedPoints.Count; i++)
         {
+            Point point = clickedPoints[i];
+
             // Ignorer les points supprimés (masqués avec -1,-1)
             if (point.X < 0 || point.Y < 0)
             {
-                k++;
                 continue;
             }
 
-            if(k % 2 == 0){
-                graph.FillEllipse(Brushes.Red, point.X - 5, point.Y - 5, 10, 10);
-                label1.BackColor = Color.White;
-                label2.BackColor = Color.Blue;
+            int owner = (i < pointOwners.Count) ? pointOwners[i] : (i % 2);
+            Color pointColor = owner == 0 ? player1.color : player2.color;
+            using (Brush pointBrush = new SolidBrush(pointColor))
+            {
+                graph.FillEllipse(pointBrush, point.X - 5, point.Y - 5, 10, 10);
             }
-            else{
-                graph.FillEllipse(Brushes.Blue, point.X - 5, point.Y - 5, 10, 10);
-                label2.BackColor = Color.White;
-                label1.BackColor = Color.Red;
-            }
-            k++;
+        }
+
+        int nextPlayer = CurrentPlayerByActionHistory();
+        if (nextPlayer == 0)
+        {
+            label1.BackColor = player1.color;
+            label2.BackColor = Color.White;
+        }
+        else
+        {
+            label2.BackColor = player2.color;
+            label1.BackColor = Color.White;
         }
     }
 
@@ -777,8 +827,8 @@ partial class Window
         Graphics graph = e.Graphics;
         graph.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-        // Mettre à jour la liste des points dans la classe Line
-        Line.ClickedPoints = clickedPoints;
+        // Mettre à jour la liste des points dans Line en respectant l'historique des actions
+        SyncLineClickedPoints();
 
         // Vérifier si joueur 1 a gagné (nombre de points configurable)
         if(player1.has(GameConfig.PointsToWin)){
@@ -936,9 +986,8 @@ partial class Window
     {
         UpdateGridMetrics();
 
-        // Vérifier si c'est le tour du joueur (inclut les missiles lancés)
-        int totalActions = clickedPoints.Count + missilesThrownCount;
-        Player currentPlayer = (totalActions % 2 == 0) ? player1 : player2;
+        // Vérifier si c'est le tour du joueur selon l'historique d'actions
+        Player currentPlayer = (CurrentPlayerByActionHistory() == 0) ? player1 : player2;
         if (currentPlayer != player)
         {
             MessageBox.Show("Ce n'est pas votre tour !");
@@ -982,6 +1031,8 @@ partial class Window
         missileAnimationTimer.Start();
 
         // Le tir consomme le tour immédiatement
+        actionHistory.Add(1);
+        SyncLineClickedPoints();
         missilesThrownCount++; // Incrémenter pour changer le tour
         tour++;
 
@@ -1000,6 +1051,7 @@ partial class Window
             if (clickedPoints[i] == p)
             {
                 clickedPoints[i] = new Point(-1, -1); // Masquer le point avec Point.Empty équivalent
+                SyncLineClickedPoints();
                 break;
             }
         }
