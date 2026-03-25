@@ -20,9 +20,9 @@ public class GameSaveManager : IDisposable
     public bool IsDatabaseEnabled => _useDatabasePersistence && _dbManager != null;
     public GameModel? CurrentGame => _currentGame;
 
-    public GameSaveManager(List<Point> clickedPoints)
+    public GameSaveManager(List<Point> clickedPoints, List<int> pointOwners = null)
     {
-        _localSave = new Save(clickedPoints);
+        _localSave = new Save(clickedPoints, pointOwners ?? new List<int>());
         _useDatabasePersistence = false;
         _pointToDbId = new Dictionary<Point, int>();
     }
@@ -262,9 +262,13 @@ public class GameSaveManager : IDisposable
     /// <summary>
     /// Sauvegarde complète locale (conserve la logique actuelle)
     /// </summary>
-    public void WriteLocalSave(string player1, string player2, List<Point> points)
+    public void WriteLocalSave(string player1, string player2, List<Point> points, List<int> owners = null)
     {
         _localSave.ClickedPoints = points;
+        if (owners != null)
+        {
+            _localSave.PointOwners = owners;
+        }
         _localSave.Write(player1, player2);
         Console.WriteLine("✓ Sauvegarde locale effectuée");
     }

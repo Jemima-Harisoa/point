@@ -441,7 +441,7 @@ partial class Window
             // DEBUG: Log des missiles avant sauvegarde
             MissileDebug.LogMissilesBeforeSave(player1, player2);
 
-            Save sauvegarde = new Save(clickedPoints);
+            Save sauvegarde = new Save(clickedPoints, pointOwners);
             // Ajouter les missiles à la sauvegarde
             sauvegarde.AddMissilesFromPlayers(player1, player2);
             sauvegarde.Write(player1.nom, player2.nom);
@@ -467,11 +467,20 @@ partial class Window
         LoadButton.MouseClick += (sender, e ) => {
             Save sauvegarde = new Save();
             clickedPoints = sauvegarde.getPointList();
-            pointOwners = new List<int>();
+            pointOwners = sauvegarde.getPointOwners();
             actionHistory = new List<int>();
+
+            // S'assurer que pointOwners a la bonne taille (par défaut i % 2 si pas d'info)
+            if (pointOwners.Count < clickedPoints.Count)
+            {
+                for (int i = pointOwners.Count; i < clickedPoints.Count; i++)
+                {
+                    pointOwners.Add(i % 2);
+                }
+            }
+
             for (int i = 0; i < clickedPoints.Count; i++)
             {
-                pointOwners.Add(i % 2);
                 actionHistory.Add(0);
             }
 

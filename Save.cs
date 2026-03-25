@@ -21,6 +21,7 @@ public class SavedMissile
 public class Save
 {
    private List<Point> _clickedPoints = new List<Point>();
+   private List<int> _pointOwners = new List<int>();
    private List<SavedMissile> _missiles = new List<SavedMissile>();
    private static string path = "C:/Users/ACER/Documents/L2/C#/point/save/save.txt";
 
@@ -33,6 +34,19 @@ public class Save
             if (value != null)
             {
                 _clickedPoints = value;
+            }
+        }
+    }
+
+    /// Propriété pour la gestion des propriétaires des points
+    public List<int> PointOwners
+    {
+        get { return _pointOwners; }
+        set
+        {
+            if (value != null)
+            {
+                _pointOwners = value;
             }
         }
     }
@@ -51,9 +65,18 @@ public class Save
     }
 
     // Constructeur
-    public Save(List<Point> points)
+    public Save(List<Point> points, List<int> owners)
     {
         ClickedPoints = points;
+        PointOwners = owners;
+        _missiles = new List<SavedMissile>();
+    }
+
+    // Constructeur par défaut
+    public Save()
+    {
+        _clickedPoints = new List<Point>();
+        _pointOwners = new List<int>();
         _missiles = new List<SavedMissile>();
     }
 
@@ -113,9 +136,11 @@ public class Save
 
         // Section POINTS
         data.AppendLine("POINTS");
-        foreach (Point point in _clickedPoints)
+        for (int i = 0; i < _clickedPoints.Count; i++)
         {
-            data.AppendFormat("({0}, {1})\n", point.X, point.Y);
+            Point point = _clickedPoints[i];
+            int owner = (i < _pointOwners.Count) ? _pointOwners[i] : (i % 2);
+            data.AppendFormat("({0}, {1}, {2})\n", point.X, point.Y, owner);
         }
 
         // Section MISSILES
@@ -150,6 +175,7 @@ public class Save
     public List<Point> getPointList()
     {
         List<Point> obj = new List<Point>();
+        _pointOwners.Clear(); // Effacer les anciens propriétaires
 
         if (!File.Exists(path))
             return obj;
@@ -180,23 +206,35 @@ public class Save
                     string cleanedInput = ligne.Trim('(', ')').Trim();
                     string[] parts = cleanedInput.Split(',');
 
-                    int[] numbers = new int[parts.Length];
-                    for (int i = 0; i < parts.Length; i++)
+                    if (parts.Length >= 2)
                     {
-                        if (int.TryParse(parts[i].Trim(), out int result))
+                        try
                         {
-                            numbers[i] = result;
-                        }
-                    }
+                            int x = int.Parse(parts[0].Trim());
+                            int y = int.Parse(parts[1].Trim());
+                            int owner = (parts.Length >= 3) ? int.Parse(parts[2].Trim()) : 0;
 
-                    if (numbers.Length == 2)
-                    {
-                        obj.Add(new Point(numbers[0], numbers[1]));
+                            obj.Add(new Point(x, y));
+                            _pointOwners.Add(owner);
+                        }
+                        catch
+                        {
+                            // Ignorer les lignes mal formées
+                        }
                     }
                 }
             }
         }
         return obj;
+    }
+
+    /// <summary>
+    /// Retourne la liste des propriétaires chargés depuis le fichier
+    /// Doit être appelé après getPointList()
+    /// </summary>
+    public List<int> getPointOwners()
+    {
+        return _pointOwners;
     }
 
     /// <summary>
@@ -286,10 +324,5 @@ public class Save
             }
         }
         return obj;
-    }
-
-    public Save()
-    {
-        _missiles = new List<SavedMissile>();
     }
 }
